@@ -1,0 +1,6 @@
+var f:bool;
+var t:bool;
+f=false;
+t=true;
+write f;
+write t;

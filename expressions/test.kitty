@@ -1,0 +1,7 @@
+var a : int;
+
+func test(a : int, b : int) : int
+  var c:int;
+  var c = a - b;
+  return c;
+end test

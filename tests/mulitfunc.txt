@@ -1,0 +1,29 @@
+func test1(a:int):int
+write a;
+return a;
+end test1
+
+func test2(b:int):int
+write c;
+return c;
+end test2
+
+func test3(c:int):int
+write c;
+return c;
+end test3
+
+
+write test1(10);
+write test2(20);
+write test3(30);
+
+func test4(d:int):int
+write d;
+write test1(10);
+write test2(20);
+write test3(30);
+return d;
+end test4
+
+write test4(40);

@@ -1,0 +1,32 @@
+
+exp.zip contains all files.
+
+----------
+
+Run flex, bison, and compile by writing the following on the command line:
+
+  make -f Makefile
+
+To run, write the following on the command line:
+
+  ./exp
+
+Now you can type an expression ended by $ and <Ctrl>-D.
+Example (leaving out the <Ctrl>-D):
+
+  3*4-1/x$
+
+  NOTE:
+
+  assign a variable, e.g.: var a:int; a=3;
+  followed by any operation causes an error, don't know why this is
+
+example for replication:
+
+ var a:int;
+ a=3;
+ func test(c:int):int
+ write 2;
+ return 1;
+ end test;
+ write 2;

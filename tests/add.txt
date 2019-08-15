@@ -1,0 +1,6 @@
+func test(a:int, b:int):int
+var c:int;
+c=a+b;
+return c;
+end test
+write test(10,20);

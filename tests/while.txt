@@ -1,0 +1,9 @@
+var c:int;
+c=0;
+
+while c < 100 do 
+{
+write c;
+c = c + ;
+}
+write c;

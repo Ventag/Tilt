@@ -1,0 +1,14 @@
+func test(a:int):int
+write a;
+
+if(a < 2) then
+write 1;
+else
+write 0;
+
+return a;
+end test
+
+write test(1);
+
+#output expected 111
