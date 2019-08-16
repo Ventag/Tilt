@@ -38,7 +38,7 @@ void ir_print(LINKEDLIST* ircode)
 			if (temp->from == unknown)
 			{
 				if(temp->label) //non-zero/not NULL
-					printf("\tmovq $%s, %%%s", temp->label, get_register_from_enum(temp->to));
+					printf("\tmovq %s, %%%s", temp->label, get_register_from_enum(temp->to));
 				else
 					printf("\tmovq $%d, %%%s", temp->value, get_register_from_enum(temp->to));
 			}

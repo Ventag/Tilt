@@ -164,7 +164,7 @@ statement_list  : statement { $$ = make_statement_empty_list($1); }
 
 statement       : RETURN_TOKEN exp ';' { $$ = make_statement_return($2); }
 				| WRITE_TOKEN exp ';' { $$ = make_statement_write($2); }
-                | ALLOCATE_TOKEN var exp ';' { $$ = make_statement_allocate($2, $3); }
+                | ALLOCATE_TOKEN var OF_LENGTH_TOKEN exp ';' { $$ = make_statement_allocate($2, $4); }
 				| var '=' exp ';' { $$ = make_statement_assign($1, $3); }
                 | IF_TOKEN exp THEN_TOKEN statement statement_else { $$ = make_statement_if($2, $4, $5); }
                 | WHILE_TOKEN exp DO_TOKEN statement { $$ = make_statement_while($2, $4); }

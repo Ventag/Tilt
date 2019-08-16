@@ -74,7 +74,7 @@ void verify_var_type(VAR_TYPE* vtype)
 	verify_type(vtype->type);
 	if (vtype->symbol->symbol_value->kind == SYMBOL_UNKNOWN)
 	{
-		fprintf(stderr, "[verify] can't deduce type @ %d\n", vtype->lineno);
+		fprintf(stderr, "[verify error] can't deduce type @ %d\n", vtype->lineno);
 		exit(1);
 	}
 }
@@ -123,17 +123,17 @@ void verify_statement(STATEMENT* statement)
 			right = func->symbol_value->return_type;
 			if (left->kind != right->kind)
 			{
-				fprintf(stderr, "[verify] function return type mistmatch @ %d\nleft: %d\nright: %d\n", statement->lineno, left->kind, right->kind);
+				fprintf(stderr, "[verify error] function return type mistmatch @ %d\nleft: %d\nright: %d\n", statement->lineno, left->kind, right->kind);
 				exit(1);
 			}
 		}
 		break;
 	case WRITE:
 		verify_exp(statement->val.exp);
-		if (statement->val.exp->symbol_value->kind == SYMBOL_ARRAY && statement->val.exp->kind != TERM_ABSOLUTE
+		if (statement->val.exp->symbol_value->kind == SYMBOL_ARRAY && statement->val.exp->val.term->kind != TERM_ABSOLUTE
 			|| statement->val.exp->symbol_value->kind == SYMBOL_RECORD)
 		{
-			fprintf(stderr, "[typechecking] error writing type, did you try to write an array or record? @ %d\n", statement->lineno);
+			fprintf(stderr, "[typechecking error] writing type, did you try to write an array or record? @ %d\n", statement->lineno);
 			exit(1);
 		}
 		break;
@@ -142,15 +142,16 @@ void verify_statement(STATEMENT* statement)
 		verify_exp(statement->val.stat_allocate.length);
 
 		left = statement->val.stat_allocate.var->symbol_value;
-		if (left->kind != SYMBOL_RECORD || left->kind != SYMBOL_ARRAY)
+		if (left->kind != SYMBOL_RECORD && left->kind != SYMBOL_ARRAY)
 		{
-			fprintf(stderr, "[typechecking] cannot allocate specific var type @ %d\n", statement->lineno);
+			fprintf(stderr, "[typechecking error] cannot allocate specific var type @ %d type is %d\n", statement->lineno, left->kind);
 			exit(1);
 		}
 
-		if (statement->val.stat_allocate.length->kind != SYMBOL_INT)
+		right = statement->val.stat_allocate.length->symbol_value;
+		if(right->kind != SYMBOL_INT)
 		{
-			fprintf(stderr, "[typechecking] allocate type differs from INT @ %d\n", statement->lineno);
+			fprintf(stderr, "[typechecking error] allocate type differs from INT @ %d type is %d\n", statement->lineno, statement->val.stat_allocate.length->symbol_value->kind);
 			exit(1);
 		}
 		break;
@@ -167,7 +168,7 @@ void verify_statement(STATEMENT* statement)
 
 		if (left->kind != right->kind)
 		{
-			fprintf(stderr, "[typechecking] this needs rework @ %d", statement->lineno);
+			fprintf(stderr, "[typechecking error] this needs rework @ %d", statement->lineno);
 			exit(1);
 		}
 
@@ -179,7 +180,7 @@ void verify_statement(STATEMENT* statement)
 
 		if (statement->val.stat_if.condition->symbol_value->kind != SYMBOL_BOOL)
 		{
-			fprintf(stderr, "[type verification] conditionals can only be boolean @ %d\n", statement->lineno);
+			fprintf(stderr, "[type verification error] conditionals can only be boolean @ %d\n", statement->lineno);
 			exit(1);
 		}
 		break;
@@ -189,7 +190,7 @@ void verify_statement(STATEMENT* statement)
 
 		if (statement->val.stat_while.condition->symbol_value->kind != SYMBOL_BOOL)
 		{
-			fprintf(stderr, "[type verification] conditionals can only be boolean @ %d\n", statement->lineno);
+			fprintf(stderr, "[type verification error] conditionals can only be boolean @ %d\n", statement->lineno);
 			exit(1);
 		}
 		break;
@@ -245,7 +246,7 @@ void verify_exp(EXP* exp)
 
 		if (left->kind != SYMBOL_INT || right->kind != SYMBOL_INT)
 		{
-			fprintf(stderr, "[type verification] wrong type received, expected int @ %d\n", exp->lineno);
+			fprintf(stderr, "[type verification error] wrong type received, expected int @ %d\n", exp->lineno);
 			exit(1);
 		}
 		else
@@ -287,7 +288,7 @@ void verify_exp(EXP* exp)
 			exp->symbol_value = create_symbol_value(SYMBOL_BOOL);
 		else
 		{
-			fprintf(stderr, "[verify] type mismatch @ %d\n", exp->lineno);
+			fprintf(stderr, "[verify error] type mismatch @ %d\n", exp->lineno);
 			exit(1);
 		}
 
@@ -304,7 +305,7 @@ void verify_exp(EXP* exp)
 
 		if (left->kind != SYMBOL_INT || right->kind != SYMBOL_INT)
 		{
-			fprintf(stderr, "[verify] wrong type received, expected int @ %d\n", exp->lineno);
+			fprintf(stderr, "[verify error] wrong type received, expected int @ %d\n", exp->lineno);
 			exit(1);
 		}
 		else
@@ -331,13 +332,13 @@ void verify_term(TERM* term)
 		SYMBOL* symbol = getSymbol(term->table, term->val.term_act_list.id);
 		if (!symbol || symbol->symbol_value->kind != SYMBOL_FUNC)
 		{
-			fprintf(stderr, "[verify] undefined function %d @ %d\n", symbol->symbol_value->kind, term->lineno);
+			fprintf(stderr, "[verify error] undefined function %d @ %d\n", symbol->symbol_value->kind, term->lineno);
 			exit(1);
 		}
 
 		if (param_count < symbol->param_count || param_count > symbol->param_count)
 		{
-			fprintf(stderr, "[verify] arguments count mismatch for function %d vs %d @ %d\n", param_count, symbol->parameters, term->lineno);
+			fprintf(stderr, "[verify error] arguments count mismatch for function %d vs %d @ %d\n", param_count, symbol->parameters, term->lineno);
 			exit(1);
 		}
 
@@ -354,7 +355,7 @@ void verify_term(TERM* term)
 	case TERM_NOT:
 		if (term->val.term->symbol_value->kind != SYMBOL_BOOL)
 		{
-			fprintf(stderr, "[verify] expected boolean @ %d\n", term->lineno);
+			fprintf(stderr, "[verify error] expected boolean @ %d\n", term->lineno);
 			exit(1);
 		}
 		term->symbol_value = term->val.term->symbol_value;
@@ -362,9 +363,11 @@ void verify_term(TERM* term)
 	case TERM_ABSOLUTE:
 		verify_exp(term->val.exp);
 		SYMBOL_TYPES kind = term->val.exp->symbol_value->kind;
-		if (kind != SYMBOL_INT || kind != SYMBOL_ARRAY)
+		//if (kind != SYMBOL_INT || kind != SYMBOL_ARRAY)
+		if(kind != SYMBOL_INT && kind != SYMBOL_ARRAY)
 		{
-			fprintf(stderr, "[verify] expected int or array @ %d\n", term->lineno);
+			fprintf(stderr, "[verify error] expected int or array @ %d\n", term->lineno);
+			fprintf(stderr, "type is %d\n", kind);
 			exit(1);
 		}
 
@@ -390,7 +393,7 @@ void verify_term(TERM* term)
 		verify_term(term->val.term);
 		if (term->val.term->symbol_value->kind != SYMBOL_INT)
 		{
-			fprintf(stderr, "[verify] expected int @ %d\n", term->lineno);
+			fprintf(stderr, "[verify error] expected int @ %d\n", term->lineno);
 			exit(1);
 		}
 		term->symbol_value = term->val.term->symbol_value;
@@ -420,13 +423,13 @@ int verify_var(VAR* var)
 			var->symbol_value = symbol->symbol_value;
 			if (symbol->symbol_kind == SYMBOL_TYPE_DEFINITION)
 			{
-				fprintf(stderr, "[type verification] symbol is a type @ %d\n", var->lineno);
+				fprintf(stderr, "[type verification error] symbol is a type @ %d\n", var->lineno);
 				exit(1);
 			}
 		}
 		else
 		{
-			fprintf(stderr, "[type verification] symbol cannot be found @ %d\n", var->lineno);
+			fprintf(stderr, "[type verification error] symbol cannot be found @ %d\n", var->lineno);
 			exit(1);
 		}
 		break;
@@ -437,13 +440,13 @@ int verify_var(VAR* var)
 
 		if (var->val.var_array.exp->symbol_value->kind != SYMBOL_INT)
 		{
-			fprintf(stderr, "[verify] expected integer @ %d\n", var->lineno);
+			fprintf(stderr, "[verify error] expected integer @ %d\n", var->lineno);
 			exit(1);
 		}
 
 		if (var->val.var_array.var->symbol_value->kind != SYMBOL_ARRAY)
 		{
-			fprintf(stderr, "[verify] expected array @ %d\n", var->lineno);
+			fprintf(stderr, "[verify error] expected array @ %d\n", var->lineno);
 			exit(1);
 		}
 
@@ -465,13 +468,13 @@ int verify_var(VAR* var)
 				var->symbol_value = symbol->symbol_value;
 			else
 			{
-				fprintf(stderr, "[verify] symbol not found @ %d\n", var->lineno);
+				fprintf(stderr, "[verify error] symbol not found @ %d\n", var->lineno);
 				exit(1);
 			}
 		}
 		else
 		{
-			fprintf(stderr, "[verify] expected record @ %d\n", var->lineno);
+			fprintf(stderr, "[verify error] expected record @ %d\n", var->lineno);
 			exit(1);
 		}
 		break;

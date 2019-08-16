@@ -259,13 +259,10 @@ DECLARATION* make_declaration_id(char* name, TYPE* type)
 {
 	DECLARATION* decl = NEW(DECLARATION);
 	decl->lineno = lineno;
-	//decl->val.id = calloc(strlen(name) + 1, sizeof(char));
-	//decl->val.type = type;
 	decl->val.identifier.type = type;
 	decl->val.identifier.id = name;
 	decl->kind = DECLARATION_ID;
 
-	fprintf(stderr, "%s / %s [] %s\n", decl->val.identifier.id, decl->name, name);
 	return decl;
 }
 

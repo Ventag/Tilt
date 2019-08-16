@@ -125,7 +125,7 @@ SYMBOL_VALUE* collect_type(TYPE* type, SYMBOL_TABLE* _st)
 		type->symbol_value = create_symbol_value(SYMBOL_RECORD);
 		type->symbol_value->child_scope = scopeSymbolTable(_st);
 		type->symbol_value->child_scope->parent = _st;
-		type->symbol_value->length = collect_var_decl_list(type->val.var_decl_list, type->symbol_value->child_scope, SYMBOL_RECORD_MEMBER);
+		type->symbol_value->length = collect_var_decl_list(type->val.var_decl_list, type->symbol_value->child_scope);
 		RESET_OFFSET;
 		type->symbol_value->records = type->val.var_decl_list;
 		break;
@@ -157,7 +157,7 @@ int collect_par_decl_list(PAR_DECL_LIST* pdecl, SYMBOL_TABLE* _st)
 	switch (pdecl->kind)
 	{
 	case PAR_DECL_LIST_POPLUATED:
-		count += collect_var_decl_list(pdecl->var_decl_list, _st, SYMBOL_PARAMETER);
+		count += collect_var_decl_list(pdecl->var_decl_list, _st);
 		increment_args_count();
 		break;
 	case PAR_DECL_LIST_EMPTY:
@@ -167,26 +167,26 @@ int collect_par_decl_list(PAR_DECL_LIST* pdecl, SYMBOL_TABLE* _st)
 	return count;
 }
 
-int collect_var_decl_list(VAR_DECL_LIST* vdecl, SYMBOL_TABLE* _st, SYMBOL_KINDS kind)
+int collect_var_decl_list(VAR_DECL_LIST* vdecl, SYMBOL_TABLE* _st)
 {
 	vdecl->table = _st;
 	int count = 1;
 	switch (vdecl->kind)
 	{
 	case VDECL_LIST:
-		collect_var_type(vdecl->var_type, _st, kind);
-		count += collect_var_decl_list(vdecl->var_decl_list, _st, kind);
+		collect_var_type(vdecl->var_type, _st);
+		count += collect_var_decl_list(vdecl->var_decl_list, _st);
 		increment_args_count();
 		break;
 	case VDECL_TYPE:
-		collect_var_type(vdecl->var_type, _st, kind);
+		collect_var_type(vdecl->var_type, _st);
 		break;
 	}
 
 	return count;
 }
 
-void collect_var_type(VAR_TYPE* vtype, SYMBOL_TABLE* _st, SYMBOL_KINDS kind)
+void collect_var_type(VAR_TYPE* vtype, SYMBOL_TABLE* _st)
 {
 	vtype->table = _st;
 
@@ -231,12 +231,12 @@ void collect_declaration(DECLARATION* decl, SYMBOL_TABLE* _st)
 			unknown_user_types++;
 			fprintf(stderr, "collect_declaration::DECLARATION_ID found unknown type\n");
 		}
-
-		symbol = putSymbol(_st, decl->val.identifier.id, symbol_value);
-		if(!symbol)
+		decl->symbol = putSymbol(_st, decl->val.identifier.id, symbol_value);
+		if(!decl->symbol)
 			exit(1);
+		fprintf(stderr, "value %d\n", symbol_value->kind);
 
-		symbol->symbol_kind = SYMBOL_TYPE_DEFINITION;
+		symbol->symbol_type = SYMBOL_TYPE_DEFINITION;
 		fprintf(stderr, "collect_declaration::DECLARATION_ID end\n");
 		break;
 	case DECLARATION_FUNC:
@@ -245,7 +245,7 @@ void collect_declaration(DECLARATION* decl, SYMBOL_TABLE* _st)
 		break;
 	case DECLARATION_VAR:
 		fprintf(stderr, "collect_declaration::DECLARATION_VAR\n");
-		collect_var_decl_list(decl->val.var_decl_list, _st, SYMBOL_LOCAL_VARIABLE);
+		collect_var_decl_list(decl->val.var_decl_list, _st);
 		decl->symbol = decl->val.var_decl_list->var_type->symbol;
 		break;
 	}
