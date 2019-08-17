@@ -4,6 +4,14 @@
 #include "instruction_set.h"
 #include "../symbols/memory.h"
 
+INSTRUCTION* _raw(char* data)
+{
+	INSTRUCTION* ir = NEW(INSTRUCTION);
+	ir->label = data;
+	ir->op = raw;
+	return ir;
+}
+
 INSTRUCTION* _pop(REGISTER to)
 {
 	INSTRUCTION* ir = NEW(INSTRUCTION);
@@ -12,13 +20,14 @@ INSTRUCTION* _pop(REGISTER to)
 	return ir;
 }
 
-INSTRUCTION* _push(REGISTER to, int val, int isoffset)
+INSTRUCTION* _push(REGISTER to, int val, int isoffset, char* label)
 {
 	INSTRUCTION* ir = NEW(INSTRUCTION);
 	ir->op = push;
 	ir->to = to; // set to unknown if value is pushed
 	ir->value = val;
 	ir->isoffset = isoffset;
+	ir->label = label;
 	return ir;
 }
 
@@ -29,7 +38,7 @@ INSTRUCTION* _ret()
 	return ir;
 }
 
-INSTRUCTION* _mov(REGISTER from, REGISTER to, int value, char* label)
+INSTRUCTION* _mov(REGISTER from, REGISTER to, int value, char* label, int reverse	)
 {
 	INSTRUCTION* ir = NEW(INSTRUCTION);
 	ir->op = mov;
@@ -37,6 +46,7 @@ INSTRUCTION* _mov(REGISTER from, REGISTER to, int value, char* label)
 	ir->to = to;
 	ir->value = value;
 	ir->label = label;
+	ir->reverse = reverse;
 	return ir;
 }
 

@@ -36,34 +36,31 @@ int Hash(char* str)
 	return hash % HashSize;
 }
 
-SYMBOL_TABLE *initSymbolTable(int id)
+SYMBOL_TABLE *initSymbolTable()
 {
 	SYMBOL_TABLE *t = NEW(SYMBOL_TABLE);
 	for(size_t i = 0; i < HashSize; i++)
 		t->table[i] = NULL;
 
 	t->next = NULL;
-	t->parent = NULL;
-	t->table_id = id;
 
 	return t;
 }
 
 SYMBOL_TABLE *scopeSymbolTable(SYMBOL_TABLE *t)
 {
-	SYMBOL_TABLE* new_table = initSymbolTable(t->table_id += 1);
+	SYMBOL_TABLE* new_table = initSymbolTable();
 	new_table->next = t;
 	return new_table;
 }
 
-SYMBOL *putSymbol(SYMBOL_TABLE *t, char* name, SYMBOL_VALUE* value)
+SYMBOL *putSymbol(SYMBOL_TABLE *t, char* name, TYPEINFO* value)
 {
 	int hash = Hash(name);
 
 	SYMBOL* s = NEW(SYMBOL);
 	s->name = name;
-	s->symbol_value = value;
-	s->table_id = t->table_id;
+	s->typeinfo = value;
 
 	fprintf(stderr, "putting symbol %s\n", name);
 
@@ -129,7 +126,34 @@ SYMBOL* getSymbol(SYMBOL_TABLE *t, char *name)
 		t = t->next;
 	}
 
-	//fprintf(stderr, "got symbol %s\n", name);
+	return symbol;
+}
+
+SYMBOL *getSymbolDepth(SYMBOL_TABLE *t, char *name, int *depth)
+{
+	if (t == NULL)
+	{
+		fprintf(stderr, "SymbolTable is NULL, tried retrieving %s\n", name);
+		return NULL;
+	}
+
+	int hash = Hash(name);
+	SYMBOL* symbol = t->table[hash];
+
+	while (t)
+	{
+		symbol = t->table[hash];
+		while (symbol)
+		{
+			if (strcmp(symbol->name, name) == 0)
+				return symbol;
+			else
+				symbol = symbol->next;
+		}
+		depth++;
+		t = t->next;
+	}
+
 	return symbol;
 }
 
@@ -146,7 +170,7 @@ void dumpSymbolTable(SYMBOL_TABLE *t)
 				SYMBOL* symbol = t->table[i];
 				while(symbol)
 				{
-					fprintf(stderr, "|-> name = %s value = %d\n", symbol->name, symbol->symbol_value);	
+					fprintf(stderr, "|-> name = %s value = %d\n", symbol->name, symbol->typeinfo);
 					symbol = symbol->next;
 				}
 			}

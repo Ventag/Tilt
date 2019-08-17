@@ -13,17 +13,27 @@ void ir_print(LINKEDLIST* ircode)
 	while (iterator != NULL)
 	{
 		temp = (INSTRUCTION*)iterator->data;
-		fprintf(stderr, "");
 
 		switch (temp->op)
 		{
+		case raw:
+			printf("\t%s", temp->label);
+			printf("\n");
+			break;
 		case pop:
 			printf("\tpop %%%s\n", get_register_from_enum(temp->to));
 			break;
 		case push:
 			printf("\tpush ");
 			if (temp->to == unknown)
-				printf("$%d", temp->value);
+			{
+			//else if (temp->label && strlen(temp->label) > 1)
+			//	printf("%s", temp->label);
+				if (temp->label)
+					printf("%s", temp->label);
+				else
+					printf("$%d", temp->value);
+			}
 			else if (temp->isoffset == 1)
 				printf("%d(%%%s)", temp->value, get_register_from_enum(temp->to));
 			else
@@ -43,7 +53,12 @@ void ir_print(LINKEDLIST* ircode)
 					printf("\tmovq $%d, %%%s", temp->value, get_register_from_enum(temp->to));
 			}
 			else if (temp->value != 0)
-				printf("\tmovq %%%s, %d(%%%s)", get_register_from_enum(temp->from), temp->value,  get_register_from_enum(temp->to));
+			{
+				if(temp->reverse)
+					printf("\tmovq %d(%%%s), %%%s", get_register_from_enum(temp->from), temp->value, get_register_from_enum(temp->to));
+				else
+					printf("\tmovq %%%s, %d(%%%s)", get_register_from_enum(temp->from), temp->value, get_register_from_enum(temp->to));
+			}
 			else
 				printf("\tmovq %%%s, %%%s", get_register_from_enum(temp->from), get_register_from_enum(temp->to));
 			printf("\n");

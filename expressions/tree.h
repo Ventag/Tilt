@@ -6,7 +6,7 @@
 typedef struct EXP
 {
 	SYMBOL_TABLE* table;
-	SYMBOL_VALUE* symbol_value;
+	TYPEINFO* typeinfo;
   int lineno;
   enum
   {
@@ -38,8 +38,8 @@ typedef struct EXP
 typedef struct FUNCTION
 {
 	SYMBOL_TABLE* table;
-	SYMBOL_VALUE* symbol_value;
-	SYMBOL_VALUE* symbol_return_value;
+	TYPEINFO* typeinfo;
+	TYPEINFO* symbol_return_value;
 	int lineno;
 	int found_return_statement;
 
@@ -51,7 +51,7 @@ typedef struct FUNCTION
 typedef struct HEAD
 {
 	SYMBOL_TABLE* table;
-	SYMBOL_VALUE* symbol_value;
+	TYPEINFO* typeinfo;
 	int lineno;
 	char* id;
 	struct PAR_DECL_LIST* par_decl_list;
@@ -75,7 +75,7 @@ typedef struct BODY
 typedef struct TYPE
 {
 	SYMBOL_TABLE* table;
-	SYMBOL_VALUE* symbol_value;
+	TYPEINFO* typeinfo;
 	int lineno;
 	enum
 	{
@@ -271,7 +271,7 @@ typedef struct STATEMENT_ELSE
 typedef struct VAR
 {
 	SYMBOL_TABLE* table;
-	SYMBOL_VALUE* symbol_value;
+	TYPEINFO* typeinfo;
 	int lineno;
 	char* id;
 
@@ -301,7 +301,7 @@ typedef struct VAR
 typedef struct TERM
 {
 	SYMBOL_TABLE* table;
-	SYMBOL_VALUE* symbol_value;
+	TYPEINFO* typeinfo;
 	int lineno;
 
 	union

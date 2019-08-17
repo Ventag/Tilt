@@ -8,68 +8,63 @@
  * Function calls will take more parameters later.
  * */
 
-typedef enum SYMBOL_TYPES
+typedef enum TYPES
 {
-	SYMBOL_FUNC,
-	SYMBOL_ID,
-	SYMBOL_INT,
-	SYMBOL_BOOL,
-	SYMBOL_ARRAY,
-	SYMBOL_RECORD,
-	SYMBOL_NULL,
-	SYMBOL_UNKNOWN
-} SYMBOL_TYPES;
+	TYPE_FUNC,
+	TYPE_ID,
+	TYPE_INT,
+	TYPE_BOOL,
+	TYPE_ARRAY,
+	TYPE_RECORD,
+	TYPE_NULL,
+	TYPE_UNKNOWN
+} TYPES;
 
-typedef enum SYMBOL_KINDS
+typedef enum SYMBOL_KIND
 {
-	SYMBOL_LOCAL_VARIABLE,
-	SYMBOL_PARAMETER,
-	SYMBOL_RECORD_MEMBER,
-	SYMBOL_TYPE_DEFINITION
-} SYMBOL_KINDS;
+	LOCALVAR,
+	PARAMETER,
+	RECORD_MEMBER
+} SYMBOL_KIND;
 
-typedef struct SYMBOL_VALUE
+typedef struct TYPEINFO
 {
-	struct SYMBOL_VALUE* array_next_value;
-	struct SYMBOL_VALUE* return_type;
+	struct TYPEINFO* array_next_value;
+	struct TYPEINFO* return_type;
 	struct SYMBOL_TABLE* child_scope;
 	struct VAR_DECL_LIST* records;
 
 	int length;
-	SYMBOL_TYPES kind;
-} SYMBOL_VALUE;
+	TYPES type;
+} TYPEINFO;
 
 typedef struct SYMBOL
 {
 	char* name;
-	int value;
-	int parameters;
 	int param_count;
-	int offset;
 	int var_offset;
 	int table_id;
 	struct SYMBOL *next;
-	struct SYMBOL_VALUE *symbol_value;
+	struct TYPEINFO *typeinfo;
 
-	SYMBOL_TYPES symbol_type;
-	SYMBOL_KINDS symbol_kind;
+	TYPES type;
+	SYMBOL_KIND kind;
 } SYMBOL;
 
 typedef struct SYMBOL_TABLE
 {
 	SYMBOL *table[HashSize];
 	struct SYMBOL_TABLE *next;
-	struct SYMBOL_TABLE *parent;
-	int table_id;
 	int local_var_count;
 } SYMBOL_TABLE;
 
 int Hash(char *str);
 
-SYMBOL_TABLE *initSymbolTable(int id);
+SYMBOL_TABLE *initSymbolTable();
 SYMBOL_TABLE *scopeSymbolTable(SYMBOL_TABLE *t);
-SYMBOL *putSymbol(SYMBOL_TABLE *t, char *name, SYMBOL_VALUE* value);
+SYMBOL *putSymbol(SYMBOL_TABLE *t, char *name, TYPEINFO* value);
 SYMBOL *getSymbol(SYMBOL_TABLE *t, char *name);
+SYMBOL *getSymbolDepth(SYMBOL_TABLE *t, char *name, int *depth);
 void dumpSymbolTable(SYMBOL_TABLE *t);
 
 #endif

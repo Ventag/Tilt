@@ -12,12 +12,14 @@ typedef struct IMMEDIATECODE
 		NONE,
 		PARAM,
 		LOCAL,
-		RECORD
+		RECORD,
+		ARRAY
 	}kind;
 
 	int onheap;
 	int offset;
 	int local_var_count;
+	int depth;
 } IMMEDIATECODE;
 
 LINKEDLIST* build_ir_tree(BODY*, int);

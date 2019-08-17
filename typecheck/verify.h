@@ -23,8 +23,8 @@ void verify_statement_list(STATEMENT_LIST*);
 void verify_else(STATEMENT_ELSE*);
 void verify_exp(EXP*);
 void verify_term(TERM*);
+void verify_var(VAR*);
 
-int verify_var(VAR*);
 int verify_act_list(ACT_LIST*);
 int verify_exp_list(EXP_LIST*);
 int get_array_length(SYMBOL_VALUE*);

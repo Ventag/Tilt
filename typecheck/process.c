@@ -2,12 +2,11 @@
 
 void process(BODY* body)
 {
-	if (unknown_user_types > 0) // do we have any unknown user types?
-	{
-		fprintf(stderr, "[process] processing user defined types\n");
-		for(int i = 0; i < 2; i++)
-			process_body(body);
-	}
+	if (unknown_user_types < 1) // do we have any unknown user types?
+		return;
+
+	fprintf(stderr, "[process] processing user defined types\n");
+	process_body(body);
 }
 
 void process_body(BODY* body)
@@ -33,14 +32,11 @@ void process_type(TYPE* type)
 	switch (type->kind)
 	{
 	case ID_T:
-		if (type->table->parent) // is this in a record?
-			symbol = getSymbol(type->table->parent, type->val.id);
-		else
-			symbol = getSymbol(type->table, type->val.id);
+		symbol = getSymbol(type->table, type->val.id);
 
-		if (symbol && symbol->symbol_value->kind != SYMBOL_UNKNOWN && type->symbol_value->kind == SYMBOL_UNKNOWN)
+		if (symbol && symbol->typeinfo->type != TYPE_UNKNOWN && type->typeinfo->type == TYPE_UNKNOWN)
 		{
-			type->symbol_value = symbol->symbol_value;
+			type->typeinfo = symbol->typeinfo;
 			fprintf(stderr, "[typechecker] identified unknown user type\n");
 		}
 
@@ -82,12 +78,12 @@ void process_var_decl_list(VAR_DECL_LIST* vdcl_list)
 
 void process_var_type(VAR_TYPE* var_type)
 {
-	SYMBOL_VALUE* symbol_val = var_type->type->symbol_value;
+	TYPEINFO* typeinfo = var_type->type->typeinfo;
 	SYMBOL* symbol = getSymbol(var_type->table, var_type->id);
-	if (symbol && symbol->symbol_type == SYMBOL_UNKNOWN && symbol_val->kind != SYMBOL_UNKNOWN)
+	if (symbol && symbol->type == TYPE_UNKNOWN && typeinfo->type != TYPE_UNKNOWN)
 	{
 		unknown_user_types -= 1;
-		symbol->symbol_type = symbol_val->kind;
+		symbol->typeinfo = typeinfo;
 		fprintf(stderr, "[typechecker] identified unknown user type\n");
 	}
 }
@@ -111,12 +107,12 @@ void process_declaration(DECLARATION* declaration)
 	{
 	case DECLARATION_ID:
 		process_type(declaration->val.identifier.type);
-		SYMBOL_VALUE* symbol_val = declaration->val.identifier.type->symbol_value;
+		TYPEINFO* typeinfo = declaration->val.identifier.type->typeinfo;
 		SYMBOL* symbol = getSymbol(declaration->table, declaration->val.identifier.id);
-		if ( symbol && symbol->symbol_type == SYMBOL_UNKNOWN && symbol_val->kind == SYMBOL_UNKNOWN )
+		if ( symbol && symbol->type == TYPE_UNKNOWN && typeinfo->type != TYPE_UNKNOWN )
 		{
 			unknown_user_types -= 1;
-			symbol->symbol_type = symbol_val->kind;
+			symbol->typeinfo = typeinfo;
 			fprintf(stderr, "[typechecker] identified unknown user type\n");
 		}
 		break;

@@ -44,15 +44,15 @@ LINKEDLIST* build_ir_tree(BODY* body, int unused)
 
 	link_push(irlist, _dir(".globl main"));
 	link_push(irlist, _lbl("main"));
-	link_push(irlist, _push(rbp, 0, 0));
-	link_push(irlist, _mov(rsp, rbp, 0, NULL));
+	link_push(irlist, _push(rbp, 0, 0, NULL));
+	link_push(irlist, _mov(rsp, rbp, 0, NULL, 0));
 
 	allocate_local_vars();
 
 	ir_statement_list(body->statement_list);
 
 	function_epilog(); // cleanup
-	link_push(irlist, _mov(unknown, rax, 0, NULL)); // exit code 0 to signal a-ok
+	link_push(irlist, _mov(unknown, rax, 0, NULL, 0)); // exit code 0 to signal a-ok
 	link_push(irlist, _ret());
 
 	body->table->local_var_count = 0;
@@ -67,10 +67,12 @@ LINKEDLIST* build_ir_tree(BODY* body, int unused)
 }
 void ir_func(FUNCTION* func)
 {
+	imc->depth++; // we're going down
 	push_stack(function_stack, func);
 	ir_head(func->head);
 	ir_body(func->body);
 	pop_stack(function_stack);
+	imc->depth--;
 }
 void ir_head(HEAD* head)
 {
@@ -122,21 +124,24 @@ void ir_var_type(VAR_TYPE* var_type)
 	{
 		case PARAM:
 			var_offset += 8; // increment first
-			symbol->offset = var_offset;
+			symbol->var_offset = var_offset;
 			fprintf(stderr, "ir_var_type[PARAM]::offset %d\n", var_offset);
 		break;
 		case LOCAL:
-			symbol->offset = -var_offset; // negate offset, we're looking inside the function, not outside
-			//link_push(irlist, "pushq $0		#allocate room on the stack for local var");
-			//link_push(irlist, _push(unknown, 0, 0));
+			symbol->var_offset = -var_offset; // negate offset, we're looking inside the function, not outside
 			fprintf(stderr, "ir_var_type[LOCAL]::offset %d\n", -var_offset);
-			imc->local_var_count += OFFSET_SIZE;
+			imc->local_var_count += OFFSET_SIZE; // count amount of local vars so we can allocate room on the stack for assignments later
 			var_offset += OFFSET_SIZE; // increment here because rbp is at 0, first args must be at -8 and second -16 etc..
 		break;
 		case RECORD:
 			link_push(datalist, var_type); // throw the records onto the heap
 			break;
+		case ARRAY:
+			link_push(datalist, var_type);
+			break;
 		default:
+			link_push(datalist, var_type);
+			fprintf(stderr, "YES HELLO I AM DOG\n");
 			// Heap it ?
 		break;
 	}
@@ -167,8 +172,8 @@ void ir_declaration(DECLARATION* decl)
 	{
 	case DECLARATION_ID:
 		symbol = getSymbol(decl->table, decl->val.identifier.id);
-		fprintf(stderr, "ir_declaration::%s\n", decl->val.identifier.id);
-		if(symbol->symbol_kind == SYMBOL_RECORD_MEMBER || decl->val.identifier.type->kind == RECORD_T)
+		fprintf(stderr, "ir_declaration::%s type::%d\n", decl->val.identifier.id,decl->val.identifier.type->typeinfo->type);
+		if(symbol->kind == RECORD_MEMBER || decl->val.identifier.type->kind == RECORD_T)
 		{
 			// not a local var, maybe heap it
 			// TODO
@@ -179,7 +184,7 @@ void ir_declaration(DECLARATION* decl)
 		{
 			var_offset += 8;
 			symbol->var_offset = var_offset;
-			link_push(irlist, _push(unknown, 0, 0));
+			link_push(irlist, _push(unknown, 0, 0, NULL));
 			fprintf(stderr, "called ir_declaration_id::ELSE\n");
 		}
 		
@@ -190,13 +195,15 @@ void ir_declaration(DECLARATION* decl)
 	case DECLARATION_VAR:
 		var_offset = 8; // reset offset
 		fprintf(stderr, "DECLARATION_VAR\n");
-		if (decl->symbol->symbol_kind == SYMBOL_RECORD)
+		if (decl->symbol->kind == RECORD_MEMBER)
 		{
-			fprintf(stderr, "declaration_var::SYMBOL_RECORD\n");
 			imc->kind = RECORD;
 		}
-		else
-			imc->kind = LOCAL;
+
+		if (decl->val.var_decl_list->var_type->type->typeinfo->type == TYPE_ARRAY)
+		{
+			imc->kind = ARRAY;
+		}
 
 		ir_var_decl_list(decl->val.var_decl_list);
 		break;
@@ -229,47 +236,47 @@ void ir_statement(STATEMENT* statement)
 		link_push(irlist, _ret()); // return after cleaning up registers
 		break;
 	case WRITE:
-		link_push(irlist, _push(rax, 0, 0)); // backup whatever is in rax
-		SYMBOL_VALUE* symbolval = statement->val.exp->symbol_value;
+		link_push(irlist, _push(rax, 0, 0, NULL)); // backup whatever is in rax
+		TYPEINFO* typeinfo = statement->val.exp->typeinfo;
 		// refer to backedup files on how to write in asm..		
-		switch (symbolval->kind)
+		switch (typeinfo->type)
 		{
-		case SYMBOL_INT:
+		case TYPE_INT:
 			ir_exp(statement->val.exp);
 			link_push(irlist, _pop(rsi));
-			link_push(irlist, _mov(unknown, rdi, 0, "pnum"));
+			link_push(irlist, _mov(unknown, rdi, 0, "pnum", 0));
 			//link_push(irlist, _mov(rax, rsi));
-			link_push(irlist, _mov(unknown, rax, 0, NULL));
+			link_push(irlist, _mov(unknown, rax, 0, NULL,0 ));
 			break;
-		case SYMBOL_BOOL:
+		case TYPE_BOOL:
 			ir_exp(statement->val.exp);
 			link_push(irlist, _pop(rax));
 			int labelid = label_count++;
 			char* bend = create_label(FLOW, "pbool", labelid);
 			char* btrue = create_label(FLOW, "ptrue", labelid);
 
-			link_push(irlist, _push(r10, 0, 0)); // backup r10
-			link_push(irlist, _mov(unknown, r10, 1, NULL));
+			link_push(irlist, _push(r10, 0, 0, NULL)); // backup r10
+			link_push(irlist, _mov(unknown, r10, 1, NULL, 0));
 			link_push(irlist, _cmp(r10, rax));
 			link_push(irlist, _pop(r10)); // restore r10
 			link_push(irlist, _je(btrue)); // if rax is equal 1, e.g. it is true, jmp to true case
 
-			link_push(irlist, _mov(unknown, rdi, 0, "$false")); // false case
-			link_push(irlist, _mov(unknown, rsi, 0, "$false"));
-			link_push(irlist, _mov(unknown, rax, 0, NULL));
+			link_push(irlist, _mov(unknown, rdi, 0, "$false", 0)); // false case
+			link_push(irlist, _mov(unknown, rsi, 0, "$false", 0));
+			link_push(irlist, _mov(unknown, rax, 0, NULL, 0));
 			link_push(irlist, _jmp(bend));
 
 			link_push(irlist, _lbl(btrue)); // true case
-			link_push(irlist, _mov(unknown, rdi, 0, btrue));
-			link_push(irlist, _mov(unknown, rsi, 0, btrue));
-			link_push(irlist, _mov(unknown, rax, 0, NULL));
+			link_push(irlist, _mov(unknown, rdi, 0, btrue, 0));
+			link_push(irlist, _mov(unknown, rsi, 0, btrue, 0));
+			link_push(irlist, _mov(unknown, rax, 0, NULL, 0));
 
 			link_push(irlist, _lbl(bend));
 			break;
-		case SYMBOL_NULL:
-			link_push(irlist, _mov(unknown, rdi, 0, "$null"));
-			link_push(irlist, _mov(unknown, rsi, 0, "$null"));
-			link_push(irlist, _mov(unknown, rax, 0, NULL));
+		case TYPE_NULL:
+			link_push(irlist, _mov(unknown, rdi, 0, "$null", 0));
+			link_push(irlist, _mov(unknown, rsi, 0, "$null", 0));
+			link_push(irlist, _mov(unknown, rax, 0, NULL, 0));
 			break;
 		default:
 			break;
@@ -278,40 +285,60 @@ void ir_statement(STATEMENT* statement)
 		link_push(irlist, _pop(rax)); // finally restore rax
 		break;
 	case ALLOCATE:
-		link_push(irlist, _push(rax, 0, 0)); // save rax
+		if (statement->val.stat_allocate.var->typeinfo->type == TYPE_ARRAY)
+		{
+			link_push(irlist, _push(rax, 0, 0, NULL)); // save rax
+			link_push(irlist, _push(rcx, 0, 0, NULL)); // save rcx
+			link_push(irlist, _push(rdx, 0, 0, NULL)); // save rdx
+			link_push(irlist, _push(rbx, 0, 0, NULL)); // save rbx
 
-		// TODO
+			ir_var(statement->val.stat_allocate.var);
+			link_push(irlist, _pop(rcx)); // pop var into rcx
+			link_push(irlist, _mov(unknown, rax, 0, "heap_next", 0));
+			link_push(irlist, _mov(rax, rcx, 0, NULL, 0));
 
-		ir_exp(statement->val.stat_allocate.length);
-		link_push(irlist, _pop(rcx));
+			ir_exp(statement->val.stat_allocate.length); // pop length into rdx
+			link_push(irlist, _pop(rdx));
+			link_push(irlist, _xor(rbx, rbx));
+			link_push(irlist, _raw("mov rdx, (rax,rbx,8)")); // move array size to 1st index
+			link_push(irlist, _inc(rdx));
+			link_push(irlist, _raw("imul $8, rdx"));  // get size of array in bytes
+			link_push(irlist, _raw("add %rdx, heap_next"));
 
+			link_push(irlist, _pop(rbx)); // restore rbx
+			link_push(irlist, _pop(rdx)); // restore rdx
+			link_push(irlist, _pop(rcx)); // restore rcx
+			link_push(irlist, _pop(rax)); // restore rax
+		}
+		else if (statement->val.stat_allocate.var->typeinfo->type == TYPE_RECORD)
+		{
 
-		ir_var(statement->val.stat_allocate.var);
-
-
-		link_push(irlist, _mov();
-
-		link_push(irlist, _pop(rax)); // backup rax
+		}
+		else
+		{
+			fprintf(stderr, "error\n");
+			exit(1);
+		}
 		break;
 	case ASSIGN:
-		link_push(irlist, _push(rbx, 0, 0)); // backup rbx
+		link_push(irlist, _push(rbx, 0, 0, NULL)); // backup rbx
 		ir_exp(statement->val.stat_assign.exp);
 		ir_var(statement->val.stat_assign.var);
 		link_push(irlist, _pop(rbx)); // restore rbx
 		// do some logic here
 		SYMBOL* symbol = getSymbol(statement->table, statement->val.stat_assign.var->id);
-		link_push(irlist, _mov(rbx, rbp, symbol->offset, NULL));
-		fprintf(stderr, "reee offset %d\n", symbol->offset);
+		link_push(irlist, _mov(rbx, rbp, symbol->var_offset, NULL, 0));
+		fprintf(stderr, "reee offset %d\n", symbol->var_offset);
 		link_push(irlist, _pop(rbx));
 		break;
 	case IF: // TODO
-		link_push(irlist, _push(rax, 0, 0)); // backup rax
+		link_push(irlist, _push(rax, 0, 0, NULL)); // backup rax
 		char* lbl_else = create_label(FLOW, "else", ilbl);
 		char* lbl_end = create_label(FLOW, "end", ilbl);
 		ir_exp(statement->val.stat_if.condition); // will push new value to stack, we pop into rax
 		link_push(irlist, _pop(rax));
-		link_push(irlist, _push(r10, 0, 0)); // backup r10
-		link_push(irlist, _mov(unknown, r10, 1, NULL)); // move 1 into r10
+		link_push(irlist, _push(r10, 0, 0, NULL)); // backup r10
+		link_push(irlist, _mov(unknown, r10, 1, NULL, 0)); // move 1 into r10
 		link_push(irlist, _cmp(r10, rax)); // cmp 1 to rax, is condition true?
 
 		if (statement->val.stat_if.optional_else->kind == ELSE_INACTIVE)
@@ -331,7 +358,7 @@ void ir_statement(STATEMENT* statement)
 		link_push(irlist, _pop(rax));
 		break;
 	case WHILE:
-		link_push(irlist, _push(rax, 0, 0)); // backup rax
+		link_push(irlist, _push(rax, 0, 0, NULL)); // backup rax
 		char* lbl_start = create_label(FLOW, "start", ilbl);
 		char* lbl_wend = create_label(FLOW, "end", ilbl);
 
@@ -339,8 +366,8 @@ void ir_statement(STATEMENT* statement)
 
 		ir_exp(statement->val.stat_while.condition);
 		link_push(irlist, _pop(rax));
-		link_push(irlist, _push(r10, 0, 0)); // backup r10
-		link_push(irlist, _mov(unknown, r10, 1, NULL));
+		link_push(irlist, _push(r10, 0, 0, NULL)); // backup r10
+		link_push(irlist, _mov(unknown, r10, 1, NULL, 0));
 		link_push(irlist, _cmp(r10, rax));
 		link_push(irlist, _pop(r10)); // restore r10
 		link_push(irlist, _jne(lbl_wend));
@@ -410,7 +437,7 @@ void ir_exp(EXP* exp) // term values will be on the stack, so pop them into regi
 			break;
 		}
 
-		link_push(irlist, _push(rcx, 0, 0));
+		link_push(irlist, _push(rcx, 0, 0, NULL));
 		break;
 	case EXP_DIV:
 		ir_exp(exp->val.branches.left);
@@ -420,7 +447,7 @@ void ir_exp(EXP* exp) // term values will be on the stack, so pop them into regi
 
 		link_push(irlist, _xor(rdx, rdx));
 		link_push(irlist, _div(rbx));
-		link_push(irlist, _push(rax, 0, 0));
+		link_push(irlist, _push(rax, 0, 0, NULL));
 		break;
 	case EXP_LESS:
 	case EXP_LESS_EQUALS:
@@ -463,14 +490,14 @@ void ir_exp(EXP* exp) // term values will be on the stack, so pop them into regi
 		}
 
 		link_push(irlist, jmp);
-		link_push(irlist, _push(unknown, 0, 0)); // push 0 to stack
+		link_push(irlist, _push(unknown, 0, 0, NULL)); // push 0 to stack
 		link_push(irlist, _pop(rbx)); // pop 0 from stack into rbx
 		link_push(irlist, _jmp(szfalse));
 		link_push(irlist, _lbl(sztrue)); // create true case
-		link_push(irlist, _push(unknown, 1, 0)); // push 1 to stack
+		link_push(irlist, _push(unknown, 1, 0, NULL)); // push 1 to stack
 		link_push(irlist, _pop(rbx)); // pop 1 from stack into rbx
 		link_push(irlist, _lbl(szfalse)); // create false case
-		link_push(irlist, _push(rbx, 0, 0));
+		link_push(irlist, _push(rbx, 0, 0, NULL));
 		break;
 	case EXP_AND:
 		break;
@@ -498,8 +525,6 @@ void ir_term(TERM* term)
 		// refer to old implementation
 		symbol = getSymbol(term->table, term->val.term_act_list.id);
 		char* func_name = create_label(FUNC, symbol->name, 0);
-		int icaller = term->table->table_id;
-		int icallee = symbol->table_id;
 
 		ir_act_list(term->val.term_act_list.act_list);
 
@@ -513,24 +538,24 @@ void ir_term(TERM* term)
 	case TERM_NOT:
 		ir_term(term->val.term);		
 		link_push(irlist, _pop(rbx)); // pop term into rbx
-		link_push(irlist, _push(rcx, 0, 0)); // backup rcx
-		link_push(irlist, _push(unknown, 1, 0)); // push 1 to stack
+		link_push(irlist, _push(rcx, 0, 0, NULL)); // backup rcx
+		link_push(irlist, _push(unknown, 1, 0, NULL)); // push 1 to stack
 		link_push(irlist, _pop(rcx)); // pop 1 into rcx
 		link_push(irlist, _xor(rcx, rbx)); // xor 1 with rbx to negate value
-		link_push(irlist, _push(rbx, 0, 0)); // push rbx onto stack
+		link_push(irlist, _push(rbx, 0, 0, NULL)); // push rbx onto stack
 		link_push(irlist, _pop(rcx)); // restore rcx
 		break;
 	case TERM_ABSOLUTE:
 		ir_exp(term->val.exp);
 
-		if (term->val.exp->symbol_value->kind == SYMBOL_INT)
+		if (term->val.exp->typeinfo->type == TYPE_INT)
 		{
 			link_push(irlist, _pop(rbx));
 			int ilabel = label_count++;
 			char* szlabel = create_label(FLOW, "abs", ilabel);
 
-			link_push(irlist, _push(rcx, 0, 0)); // backup rcx
-			link_push(irlist, _push(unknown, 0, 0)); // push 0 to stack
+			link_push(irlist, _push(rcx, 0, 0, NULL)); // backup rcx
+			link_push(irlist, _push(unknown, 0, 0, NULL)); // push 0 to stack
 			link_push(irlist, _pop(rcx)); // pop 0 into rcx
 			link_push(irlist, _cmp(rcx, rbx)); // compare
 			link_push(irlist, _jge(szlabel));
@@ -538,10 +563,10 @@ void ir_term(TERM* term)
 			link_push(irlist, _neg(rbx)); // needs to take register instead of char
 			link_push(irlist, _lbl(szlabel));
 
-			link_push(irlist, _push(rbx, 0, 0));
+			link_push(irlist, _push(rbx, 0, 0, NULL));
 			link_push(irlist, _pop(rcx)); // restore rcx
 		}
-		else if (term->val.exp->symbol_value->kind == SYMBOL_ARRAY)
+		else if (term->val.exp->typeinfo->type == TYPE_ARRAY)
 		{
 			link_push(irlist, _pop(rax));
 			link_push(irlist, _xor(rcx, rcx));
@@ -550,14 +575,14 @@ void ir_term(TERM* term)
 
 		break;
 	case TERM_NUM:
-		link_push(irlist, _push(unknown, term->val.num, 0));
+		link_push(irlist, _push(unknown, term->val.num, 0, NULL));
 		break;
 	case TERM_TRUE:
-		link_push(irlist, _push(unknown, 1, 0));
+		link_push(irlist, _push(unknown, 1, 0, NULL));
 		break;
 	case TERM_FALSE:
 	case TERM_NULL:
-		link_push(irlist, _push(unknown, 0, 0));
+		link_push(irlist, _push(unknown, 0, 0, NULL));
 		break;
 	default:
 		break;
@@ -566,40 +591,53 @@ void ir_term(TERM* term)
 
 void ir_var(VAR* var) // revisit this
 {
+	SYMBOL* symbol = NULL;
+	int depth = 0;
 	switch (var->kind) // TODO
 	{
 	case VAR_ID:
-		fprintf(stderr, "VAR_ID\n");
-		SYMBOL* symbol = getSymbol(var->table, var->id);
-		int offset = symbol->offset;
-
-		//if (false) // if we are assigning the variables passed as arguments
-		//{
-
-		//}
-		//elseb
-		//{
-		//symbol->symbol_type
-		//fprintf(stderr, "symboltype: %d : symbolkind %d\n", symbol->symbol_type, symbol->symbol_kind);
-
-		/*if (symbol->symbol_value->kind == SYMBOL_ARRAY || symbol->symbol_value->kind == SYMBOL_RECORD)
+		// Static link lookup
+		symbol = getSymbolDepth(var->table, var->id, &depth);
+		if (!symbol)
 		{
-			link_push(irlist, _push(r15, 0, 0));
-			link_push(irlist, _mov(unknown, r15, 0, var->id)); // array is on heap
-		}
-		else*/ if (symbol->symbol_kind == SYMBOL_PARAMETER)
-		{
-			link_push(irlist, _push(rbp, offset, 1));
+			fprintf(stderr, "[codegen error] can't retrieve symbol for %s @ %d\n", var->id, var->lineno);
+			exit(1);
 		}
 
-		fprintf(stderr, "ir_var::imc->kind %d %d\n", imc->kind, symbol->symbol_kind, symbol->symbol_type);
-
-		//det->offset = offset;
-		//}
+		int offset = symbol->var_offset;
+		if ((symbol->typeinfo->type == TYPE_ARRAY || symbol->typeinfo->type == TYPE_RECORD) && symbol->kind != PARAMETER)
+		{
+			link_push(irlist, _push(unknown, 0, 0, var->id));
+		}
+		else
+		{
+			if (depth == 0)
+			{
+				link_push(irlist, _push(rbp, offset, 1, NULL)); // same scope
+			}
+			else if (depth > 0)
+			{
+				link_push(irlist, _mov(rbp, r15, 16, NULL, 1)); // REVERSE IT
+				for (int i = 0; i < (depth - 1); i++)
+				{
+					link_push(irlist, _mov(r15, r15, 16, NULL, 1));
+				}
+				link_push(irlist, _push(r15, symbol->var_offset, 1, NULL));
+			}
+		}
 
 		break;
 	case VAR_ARRAY:
-		fprintf(stderr, "VAR_ARRAY\n");
+		link_push(irlist, _push(rdi, 0, 0, NULL)); // backup registers
+		link_push(irlist, _push(rsi, 0, 0, NULL));
+		ir_var(var->val.var_array.var);
+		link_push(irlist, _pop(rsi));
+		ir_exp(var->val.var_array.exp);
+		link_push(irlist, _pop(rdi));
+		link_push(irlist, _inc(rdi)); // increment, first element is storing size
+		link_push(irlist, _raw("push (%rsi,rdi,8)"));
+
+		fprintf(stderr, "VAR_ARRAY\n"); // restore rsi, rdi afterward
 		break;
 	case VAR_RECORD:
 		fprintf(stderr, "VAR_RECORD\n");
@@ -609,20 +647,20 @@ void ir_var(VAR* var) // revisit this
 
 void function_prolog(SYMBOL_TABLE* scope)
 {
-	link_push(irlist, _push(rbp, 0, 0)); 		// save calling functions base pointer
-	link_push(irlist, _mov(rsp, rbp, 0, NULL)); // move stack pointer into base pointer
+	link_push(irlist, _push(rbp, 0, 0, NULL)); 		// save calling functions base pointer
+	link_push(irlist, _mov(rsp, rbp, 0, NULL, 0)); // move stack pointer into base pointer
 												// allocate x*8 amount of bytes for this funcs local variables
 	allocate_local_vars();					// so that we can refer to them on the stack
 	imc->local_var_count = 0;
 
 	// CALLEE
-	link_push(irlist, _push(rbx, 0, 0));
-	link_push(irlist, _push(rsi, 0, 0));
-	link_push(irlist, _push(rdi, 0, 0));
+	link_push(irlist, _push(rbx, 0, 0, NULL));
+	link_push(irlist, _push(rsi, 0, 0, NULL));
+	link_push(irlist, _push(rdi, 0, 0, NULL));
 
 	// CALLER
-	link_push(irlist, _push(rcx, 0, 0));
-	link_push(irlist, _push(rdx, 0, 0));
+	link_push(irlist, _push(rcx, 0, 0, NULL));
+	link_push(irlist, _push(rdx, 0, 0, NULL));
 }
 
 void function_epilog() // do we really need more registers when we're not doing any register allocation?
@@ -636,7 +674,7 @@ void function_epilog() // do we really need more registers when we're not doing 
 	link_push(irlist, _pop(rsi));
 	link_push(irlist, _pop(rbx));
 
-	link_push(irlist, _mov(rbp, rsp, 0, NULL));
+	link_push(irlist, _mov(rbp, rsp, 0, NULL, 0));
 	link_push(irlist, _pop(rbp));
 }
 
@@ -645,7 +683,7 @@ void allocate_local_vars()
 	int varcount = imc->local_var_count / OFFSET_SIZE;
 	for (int i = 0; i < varcount; i++)
 	{
-		link_push(irlist, _push(unknown, 0, 0));
+		link_push(irlist, _push(unknown, 0, 0, NULL));
 	}
 }
 
@@ -668,15 +706,15 @@ char* create_label(LABEL_KIND kind, char* content, int offset)
 	return label;
 }
 
-int is_already_defined(LINKEDLIST *definedList, char *labelName) {
+int is_already_defined(LINKEDLIST *definedList, char *labelName) 
+{
+	LINKEDLIST *iterator = definedList;
 
-	LINKEDLIST *iterator = definedList->next;
-
-	while (iterator != definedList) {
-
-		if (strcmp(labelName, (char*)iterator->data) == 0) {
+	while (iterator->data != NULL)
+	{
+		if (strcmp(labelName, iterator->data) == 0)
 			return 1;
-		}
+
 		iterator = iterator->next;
 	}
 	return 0;
@@ -705,9 +743,9 @@ void data_section() // revisit / rewrite
 		VAR_TYPE* vtype = (VAR_TYPE*)iterator->data;
 		SYMBOL* symbol = getSymbol(vtype->table, vtype->id);
 
-		if (symbol && (symbol->symbol_kind == SYMBOL_ARRAY || symbol->symbol_kind == SYMBOL_RECORD))
+		if (symbol && (symbol->typeinfo->type == TYPE_ARRAY || symbol->typeinfo->type == TYPE_RECORD))
 		{
-			if (!is_already_defined(definitions, vtype->id)) // did we define it already?
+			if (is_already_defined(definitions, vtype->id) == 0) // did we define it already?
 			{
 				link_push(irlist, _spc(vtype->id, OFFSET_SIZE));
 				link_push(definitions, vtype->id);

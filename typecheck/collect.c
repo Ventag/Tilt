@@ -3,8 +3,6 @@
 #include "../symbols/linkedlist.h"
 
 int unknown_user_types = 0;
-int function_count = 0;
-int current_offset = 1;
 int args_count = 0;
 
 void increment_args_count()
@@ -16,9 +14,6 @@ void reset_args_count()
 {
 	args_count = 0;
 }
-
-#define INCREMENT_OFFSET (current_offset++)
-#define RESET_OFFSET (current_offset = 1)
 #define MAX_FUNCTION_NAME_LENGTH 128
 
 LINKEDLIST* function_names;
@@ -29,7 +24,7 @@ void collect(BODY* body)
 {
 	function_names = link_initialize();
 	fprintf(stderr, "[collect] type collection started\n");
-	parent_table = initSymbolTable(0);
+	parent_table = initSymbolTable();
 	collect_body(body, parent_table);
 	dumpSymbolTable(parent_table);
 }
@@ -37,26 +32,24 @@ void collect(BODY* body)
 void collect_func(FUNCTION* func, SYMBOL_TABLE* _st)
 {
 	func->table = scopeSymbolTable(_st);
-
 	collect_head(func->head, func->table);
 	collect_body(func->body, func->table);
-	func->symbol_value = func->head->symbol_value;
+	func->typeinfo = func->head->typeinfo;
 }
 
 void collect_head(HEAD* head, SYMBOL_TABLE* _st)
 {
 	if(sizeof(head->id) > MAX_FUNCTION_NAME_LENGTH)
 	{
-		fprintf(stderr, "function name is too long @ %s\n", head->lineno);
+		fprintf(stderr, "function name is too long @ %d\n", head->lineno);
 		exit(1);
 	}
 	head->table = _st;
-	head->symbol_value = create_symbol_value(SYMBOL_FUNC);
+	head->typeinfo = create_type(TYPE_FUNC);
 
-	SYMBOL* symbol = putSymbol(_st->next, head->id, head->symbol_value);
+	SYMBOL* symbol = putSymbol(_st->next, head->id, head->typeinfo);
 	collect_par_decl_list(head->par_decl_list, _st);
-	symbol->param_count = collect_par_decl_list(head->par_decl_list, _st);
-	RESET_OFFSET;
+	symbol->param_count = args_count;
 	reset_args_count();
 
 	char* data = link_seek(function_names, (char*)head->id);
@@ -67,8 +60,8 @@ void collect_head(HEAD* head, SYMBOL_TABLE* _st)
 	}
 	link_push(function_names, head->id);
 	
-	SYMBOL_VALUE *type = collect_type(head->type, _st);
-	head->symbol_value->return_type = type;
+	TYPEINFO *type = collect_type(head->type, _st);
+	head->typeinfo->return_type = type;
 }
 
 void collect_body(BODY* body, SYMBOL_TABLE* _st)
@@ -78,56 +71,46 @@ void collect_body(BODY* body, SYMBOL_TABLE* _st)
 	collect_statement_list(body->statement_list, _st);
 }
 
-SYMBOL_VALUE* collect_type(TYPE* type, SYMBOL_TABLE* _st)
+TYPEINFO* collect_type(TYPE* type, SYMBOL_TABLE* _st)
 {
 	type->table = _st;
 	SYMBOL* symbol = NULL;
 
 	switch (type->kind)
 	{
-	case ID_T: // TODO
+	case ID_T:
 		fprintf(stderr, "[collect_type::ID_T] %s\n", type->val.id);
 		symbol = getSymbol(_st, type->val.id);
-		if (symbol != NULL && symbol->symbol_type != SYMBOL_UNKNOWN)
+
+		if (symbol == NULL || symbol->type == TYPE_UNKNOWN)
 		{
-			type->symbol_value = symbol->symbol_value;
-			fprintf(stderr, "found symbol current\n");
-			return symbol->symbol_value;
-		}
-		else if (symbol == NULL && _st->parent != NULL)
-		{
-			symbol = getSymbol(_st->parent, type->val.id);
-			if (symbol != NULL && symbol->symbol_type != SYMBOL_UNKNOWN)
-			{
-				type->symbol_value = symbol->symbol_value;
-				fprintf(stderr, "found symbol parent\n");
-				return symbol->symbol_value;
-			}
+			fprintf(stderr, "[collect error] couldn't find symbol\n");
+			type->typeinfo = create_type(TYPE_UNKNOWN);
+			return type->typeinfo;
 		}
 
-		type->symbol_value = create_symbol_value(SYMBOL_UNKNOWN);
+		type->typeinfo = symbol->typeinfo;
+		fprintf(stderr, "found symbol current\n");
+		return symbol->typeinfo;
+
 		break;
 	case INT_T:
-		//fprintf(stderr, "collect_type::INT_T\n");
-		type->symbol_value = create_symbol_value(SYMBOL_INT);
+		type->typeinfo = create_type(TYPE_INT);
 		break;
 	case BOOL_T:
-		//fprintf(stderr, "collect_type::BOOL_T\n");
-		type->symbol_value = create_symbol_value(SYMBOL_BOOL);
+		type->typeinfo = create_type(TYPE_BOOL);
 		break;
 	case ARRAY_T:
-		//fprintf(stderr, "collect_type::ARRAY_T\n");
-		type->symbol_value = create_symbol_value(SYMBOL_ARRAY);
-		type->symbol_value->array_next_value = collect_type(type->val.type, _st);
+		type->typeinfo = create_type(TYPE_ARRAY);
+		type->typeinfo->array_next_value = collect_type(type->val.type, _st);
 		break;
 	case RECORD_T: // create a symbol table for each record
-		//fprintf(stderr, "collect_type::RECORD_T\n");
-		type->symbol_value = create_symbol_value(SYMBOL_RECORD);
-		type->symbol_value->child_scope = scopeSymbolTable(_st);
-		type->symbol_value->child_scope->parent = _st;
-		type->symbol_value->length = collect_var_decl_list(type->val.var_decl_list, type->symbol_value->child_scope);
-		RESET_OFFSET;
-		type->symbol_value->records = type->val.var_decl_list;
+		type->typeinfo = create_type(TYPE_RECORD);
+		type->typeinfo->child_scope = scopeSymbolTable(_st);
+		collect_var_decl_list(type->val.var_decl_list, type->typeinfo->child_scope); // count members
+		type->typeinfo->length = args_count; // count stored in args_count
+		reset_args_count();
+		type->typeinfo->records = type->val.var_decl_list;
 		break;
 	default:
 		//fprintf(stderr, "error: collect_type [unknown type]\n");
@@ -135,55 +118,49 @@ SYMBOL_VALUE* collect_type(TYPE* type, SYMBOL_TABLE* _st)
 		break;
 	}
 
-	return type->symbol_value;
+	return type->typeinfo;
 }
 
-SYMBOL_VALUE* create_symbol_value(SYMBOL_TYPES kind)
+TYPEINFO* create_type(TYPES kind)
 {
-	SYMBOL_VALUE* symbol = NEW(SYMBOL_VALUE);
+	TYPEINFO* symbol = NEW(TYPEINFO);
 	symbol->array_next_value = NULL;
 	symbol->child_scope = NULL;
 	symbol->records = NULL;
 	symbol->return_type = NULL;
-	symbol->kind = kind;
+	symbol->type = kind;
 
 	return symbol;
 }
 
-int collect_par_decl_list(PAR_DECL_LIST* pdecl, SYMBOL_TABLE* _st)
+void collect_par_decl_list(PAR_DECL_LIST* pdecl, SYMBOL_TABLE* _st)
 {
 	pdecl->table = _st;
-	int count = 0;
 	switch (pdecl->kind)
 	{
 	case PAR_DECL_LIST_POPLUATED:
-		count += collect_var_decl_list(pdecl->var_decl_list, _st);
+		/*count +=*/ collect_var_decl_list(pdecl->var_decl_list, _st);
 		increment_args_count();
 		break;
 	case PAR_DECL_LIST_EMPTY:
-		return 0;
+		break;
 	}
-
-	return count;
 }
 
-int collect_var_decl_list(VAR_DECL_LIST* vdecl, SYMBOL_TABLE* _st)
+void collect_var_decl_list(VAR_DECL_LIST* vdecl, SYMBOL_TABLE* _st)
 {
 	vdecl->table = _st;
-	int count = 1;
 	switch (vdecl->kind)
 	{
 	case VDECL_LIST:
 		collect_var_type(vdecl->var_type, _st);
-		count += collect_var_decl_list(vdecl->var_decl_list, _st);
+		collect_var_decl_list(vdecl->var_decl_list, _st);
 		increment_args_count();
 		break;
 	case VDECL_TYPE:
 		collect_var_type(vdecl->var_type, _st);
 		break;
 	}
-
-	return count;
 }
 
 void collect_var_type(VAR_TYPE* vtype, SYMBOL_TABLE* _st)
@@ -191,12 +168,12 @@ void collect_var_type(VAR_TYPE* vtype, SYMBOL_TABLE* _st)
 	vtype->table = _st;
 
 	// Acquire the type of the variable
-	SYMBOL_VALUE* symbol_type = collect_type(vtype->type, _st);
+	TYPEINFO* typeinfo = collect_type(vtype->type, _st);
 
-	if (symbol_type->kind == SYMBOL_UNKNOWN) // Only happens if vtype->type is ID and it cant be found in local/outer scope
+	if (typeinfo->type == TYPE_UNKNOWN) // Only happens if vtype->type is ID and it cant be found in local/outer scope
 		unknown_user_types++;
 
-	vtype->symbol = putSymbol(_st, vtype->id, symbol_type);
+	vtype->symbol = putSymbol(_st, vtype->id, typeinfo);
 }
 
 void collect_decl_list(DECL_LIST* declist, SYMBOL_TABLE* _st)
@@ -217,26 +194,24 @@ void collect_decl_list(DECL_LIST* declist, SYMBOL_TABLE* _st)
 void collect_declaration(DECLARATION* decl, SYMBOL_TABLE* _st)
 {
 	decl->table = _st;
-	SYMBOL_VALUE* symbol_value = NULL;
+	TYPEINFO* typeinfo = NULL;
 	SYMBOL* symbol = NULL;
 
 	switch (decl->kind)
 	{
 	case DECLARATION_ID:
 		fprintf(stderr, "collect_declaration::DECLARATION_ID %s\n", decl->val.identifier.id);
-		symbol_value = collect_type(decl->val.identifier.type, _st);
+		typeinfo = collect_type(decl->val.identifier.type, _st);
 
-		if (symbol_value->kind == SYMBOL_UNKNOWN)
+		if (typeinfo->type == TYPE_UNKNOWN)
 		{
 			unknown_user_types++;
 			fprintf(stderr, "collect_declaration::DECLARATION_ID found unknown type\n");
 		}
-		decl->symbol = putSymbol(_st, decl->val.identifier.id, symbol_value);
+		decl->symbol = putSymbol(_st, decl->val.identifier.id, typeinfo);
 		if(!decl->symbol)
 			exit(1);
-		fprintf(stderr, "value %d\n", symbol_value->kind);
 
-		symbol->symbol_type = SYMBOL_TYPE_DEFINITION;
 		fprintf(stderr, "collect_declaration::DECLARATION_ID end\n");
 		break;
 	case DECLARATION_FUNC:
@@ -370,16 +345,16 @@ void collect_term(TERM* term, SYMBOL_TABLE* _st)
 		collect_expression(term->val.exp, _st);
 		break;
 	case TERM_NUM:
-		term->symbol_value = create_symbol_value(SYMBOL_INT);
+		term->typeinfo = create_type(TYPE_INT);
 		break;
 	case TERM_TRUE:
-		term->symbol_value = create_symbol_value(SYMBOL_BOOL);
+		term->typeinfo = create_type(TYPE_BOOL);
 		break;
 	case TERM_FALSE:
-		term->symbol_value = create_symbol_value(SYMBOL_BOOL);
+		term->typeinfo = create_type(TYPE_BOOL);
 		break;
 	case TERM_NULL:
-		term->symbol_value = create_symbol_value(SYMBOL_NULL);
+		term->typeinfo = create_type(TYPE_NULL);
 	case TERM_UMINUS:
 		collect_term(term->val.term, _st);
 		break;
