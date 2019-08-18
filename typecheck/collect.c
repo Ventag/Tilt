@@ -26,7 +26,6 @@ void collect(BODY* body)
 	fprintf(stderr, "[collect] type collection started\n");
 	parent_table = initSymbolTable();
 	collect_body(body, parent_table);
-	dumpSymbolTable(parent_table);
 }
 
 void collect_func(FUNCTION* func, SYMBOL_TABLE* _st)
@@ -79,7 +78,6 @@ TYPEINFO* collect_type(TYPE* type, SYMBOL_TABLE* _st)
 	switch (type->kind)
 	{
 	case ID_T:
-		fprintf(stderr, "[collect_type::ID_T] %s\n", type->val.id);
 		symbol = getSymbol(_st, type->val.id);
 
 		if (symbol == NULL || symbol->type == TYPE_UNKNOWN)
@@ -90,7 +88,6 @@ TYPEINFO* collect_type(TYPE* type, SYMBOL_TABLE* _st)
 		}
 
 		type->typeinfo = symbol->typeinfo;
-		fprintf(stderr, "found symbol current\n");
 		return symbol->typeinfo;
 
 		break;
@@ -200,26 +197,21 @@ void collect_declaration(DECLARATION* decl, SYMBOL_TABLE* _st)
 	switch (decl->kind)
 	{
 	case DECLARATION_ID:
-		fprintf(stderr, "collect_declaration::DECLARATION_ID %s\n", decl->val.identifier.id);
 		typeinfo = collect_type(decl->val.identifier.type, _st);
 
 		if (typeinfo->type == TYPE_UNKNOWN)
-		{
 			unknown_user_types++;
-			fprintf(stderr, "collect_declaration::DECLARATION_ID found unknown type\n");
-		}
+
 		decl->symbol = putSymbol(_st, decl->val.identifier.id, typeinfo);
 		if(!decl->symbol)
 			exit(1);
 
-		fprintf(stderr, "collect_declaration::DECLARATION_ID end\n");
+		decl->symbol->kind = TYPEDEF;
 		break;
 	case DECLARATION_FUNC:
-		fprintf(stderr, "collect_declaration::DECLARATION_FUNC\n");
 		collect_func(decl->val.function, _st);
 		break;
 	case DECLARATION_VAR:
-		fprintf(stderr, "collect_declaration::DECLARATION_VAR\n");
 		collect_var_decl_list(decl->val.var_decl_list, _st);
 		decl->symbol = decl->val.var_decl_list->var_type->symbol;
 		break;

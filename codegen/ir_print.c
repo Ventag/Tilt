@@ -64,7 +64,10 @@ void ir_print(LINKEDLIST* ircode)
 			printf("\n");
 			break;
 		case add:
-			printf("\taddq %%%s, %%%s", get_register_from_enum(temp->from), get_register_from_enum(temp->to));
+			if(temp->from == unknown)
+				printf("\taddq $%d, %%%s", temp->value, get_register_from_enum(temp->to));
+			else
+				printf("\taddq %%%s, %%%s", get_register_from_enum(temp->from), get_register_from_enum(temp->to));
 			printf("\n");
 			break;
 		case sub:

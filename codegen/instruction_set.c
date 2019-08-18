@@ -50,12 +50,13 @@ INSTRUCTION* _mov(REGISTER from, REGISTER to, int value, char* label, int revers
 	return ir;
 }
 
-INSTRUCTION* _add(REGISTER from, REGISTER to)
+INSTRUCTION* _add(REGISTER from, REGISTER to, int value)
 {
 	INSTRUCTION* ir = NEW(INSTRUCTION);
 	ir->op = add;
 	ir->from = from;
 	ir->to = to;
+	ir->value = value;
 	return ir;
 }
 

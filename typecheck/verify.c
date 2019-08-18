@@ -172,6 +172,17 @@ void verify_statement(STATEMENT* statement)
 		left = statement->val.stat_assign.var->typeinfo;
 		right = statement->val.stat_assign.exp->typeinfo;
 
+		SYMBOL* symbol = getSymbol(statement->val.stat_assign.var->table, statement->val.stat_assign.var->id);
+		if (symbol)
+		{
+			if (symbol->kind == TYPEDEF)
+			{
+				fprintf(stderr, "tried assigning a typedef directly\n");
+				printf("error\n");
+				exit(1);
+			}
+		}
+
 		/*
 		TODO: Handle record assignments here
 		*/

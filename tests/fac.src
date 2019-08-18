@@ -1,0 +1,8 @@
+func fac(n:int):int
+if(n==0) || (n==1) then
+	return 1;
+else
+	return n * fac(n-1);
+end fac
+
+write fac(5);

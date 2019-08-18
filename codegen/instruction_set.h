@@ -24,9 +24,6 @@ typedef struct INSTRUCTION
 	int value;
 	int isoffset;
 	int reverse;
-
-	struct INSTRUCTION *args1;
-	struct INSTRUCTION *args2;
 } INSTRUCTION;
 
 INSTRUCTION* _raw(char* data);
@@ -34,7 +31,7 @@ INSTRUCTION* _pop(REGISTER);
 INSTRUCTION* _push(REGISTER, int value, int ifoffset, char* label);
 INSTRUCTION* _ret();
 INSTRUCTION* _mov(REGISTER, REGISTER, int, char*, int);
-INSTRUCTION* _add(REGISTER, REGISTER);
+INSTRUCTION* _add(REGISTER, REGISTER, int);
 INSTRUCTION* _sub(REGISTER, REGISTER);
 INSTRUCTION* _mul(REGISTER, REGISTER);
 INSTRUCTION* _xor(REGISTER, REGISTER);
