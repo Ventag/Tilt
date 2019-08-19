@@ -184,12 +184,13 @@ void verify_statement(STATEMENT* statement)
 		}
 
 		/*
-		TODO: Handle record assignments here
+		TODO: Handle record & array assignments here
 		*/
 
 		if (left->type != right->type)
 		{
-			fprintf(stderr, "[typechecking error] this needs rework @ %d", statement->lineno);
+			fprintf(stderr, "[typechecking error] this needs rework @ %d\n", statement->lineno);
+			fprintf(stderr, "left: %d right %d\n", left->type, right->type);
 			exit(1);
 		}
 
@@ -467,7 +468,22 @@ void verify_var(VAR* var)
 		TODO: Compare array base types
 		*/
 
-		var->typeinfo = var->val.var_array.var->typeinfo;
+		TYPEINFO* type = var->val.var_array.var->typeinfo;
+		int length = 1;
+		while (type->array_next_value != NULL)
+		{
+			length++;
+			type = type->array_next_value;
+		}
+		type->length = length;
+
+		if (depth_count == length)
+			var->typeinfo = type;
+		else
+			var->typeinfo = var->val.var_array.var->typeinfo;
+
+		fprintf(stderr, "var: %d vs base %d\n", var->val.var_array.var->typeinfo->type, type->type);
+
 		break;
 	case VAR_RECORD:
 		verify_var(var->val.var_record.var);

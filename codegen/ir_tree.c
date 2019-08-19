@@ -218,6 +218,7 @@ void ir_statement_list(STATEMENT_LIST* statement_list)
 void ir_statement(STATEMENT* statement)
 {
 	int ilbl = label_count++;
+	fprintf(stderr, "%d\n", statement->kind);
 	switch (statement->kind)
 	{
 	case RETURN:
@@ -229,14 +230,12 @@ void ir_statement(STATEMENT* statement)
 	case WRITE:
 		link_push(irlist, _push(rax, 0, 0, NULL)); // backup whatever is in rax
 		TYPEINFO* typeinfo = statement->val.exp->typeinfo;
-		// refer to backedup files on how to write in asm..		
 		switch (typeinfo->type)
 		{
 		case TYPE_INT:
 			ir_exp(statement->val.exp);
 			link_push(irlist, _pop(rsi));
 			link_push(irlist, _mov(unknown, rdi, 0, "$pnum", 0));
-			//link_push(irlist, _mov(rax, rsi));
 			link_push(irlist, _mov(unknown, rax, 0, NULL,0 ));
 			break;
 		case TYPE_BOOL:
@@ -311,15 +310,22 @@ void ir_statement(STATEMENT* statement)
 			exit(1);
 		}
 		break;
-	case ASSIGN:
+	case ASSIGN: // array assignment crashes here
 		link_push(irlist, _push(rbx, 0, 0, NULL)); // backup rbx
 		ir_exp(statement->val.stat_assign.exp);
+		link_push(irlist, _pop(rbx)); // store exp in rbx
 		ir_var(statement->val.stat_assign.var);
-		link_push(irlist, _pop(rbx)); // restore rbx
-		// do some logic here
-		SYMBOL* symbol = getSymbol(statement->table, statement->val.stat_assign.var->id);
-		link_push(irlist, _mov(rbx, rbp, symbol->var_offset, NULL, 0));
-		link_push(irlist, _raw("#debug here"));
+		link_push(irlist, _pop(rcx)); // store var in rcx
+		if (statement->val.stat_assign.var->kind == VAR_ARRAY)
+		{
+			//link_push(irlist, _mov(rbx, rcx, 0, NULL, 0)); // address is pushed to the stack, we just pop it into rcx
+			link_push(irlist, _raw("mov rbx, (rcx)")); // raw because no time to widen _mov function to deref pointers...
+		}
+		if (statement->val.stat_assign.var->kind == VAR_ID)
+		{
+			SYMBOL* symbol = getSymbol(statement->table, statement->val.stat_assign.var->id);
+			link_push(irlist, _mov(rbx, rbp, symbol->var_offset, NULL, 0));
+		}
 		link_push(irlist, _pop(rbx));
 		break;
 	case IF: // TODO
@@ -559,11 +565,8 @@ void ir_term(TERM* term)
 
 		ir_act_list(term->val.term_act_list.act_list);
 
-		/*if (depth == 0)
-		{
+		if (depth == 0)
 			link_push(irlist, _push(rbp, 16, 1, NULL)); // same scope
-			fprintf(stderr, "depth::svo::%d\n", symbol->var_offset);
-		}
 		else if (depth > 0)
 		{
 			link_push(irlist, _mov(rbp, r15, 16, NULL, 1)); // reverse the order
@@ -572,10 +575,10 @@ void ir_term(TERM* term)
 				link_push(irlist, _mov(r15, r15, 16, NULL, 1));
 			}
 			link_push(irlist, _push(r15, symbol->var_offset, 1, NULL));
-		}*/
+		}
 
 		link_push(irlist, _call(func_name));
-		link_push(irlist, _add(unknown, rsp, symbol->param_count * 8));
+		link_push(irlist, _add(unknown, rsp, symbol->param_count * 8)); // add to stack counter to 'deallocate' local variables
 		link_push(irlist, _push(rax, 0, 0, NULL));
 		break;
 	case TERM_PARENTHESES:
