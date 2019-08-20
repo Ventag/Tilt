@@ -47,6 +47,7 @@ FUNCTION* weed_func(FUNCTION* func)
         exit(1);
     }
 
+    found_return_statement = 0;
     function_depth--;
     return func;
 }
