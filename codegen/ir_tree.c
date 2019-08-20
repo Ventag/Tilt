@@ -11,11 +11,6 @@ STACK* function_stack;
 LINKEDLIST* irlist;
 LINKEDLIST* datalist;
 
-INSTRUCTION* print_num;
-INSTRUCTION* print_true;
-INSTRUCTION* print_false;
-INSTRUCTION* print_null;
-
 int label_count = 0;
 int should_print = 0;
 int offset_depth = 0;
@@ -30,11 +25,6 @@ LINKEDLIST* build_ir_tree(BODY* body, int unused)
 	function_stack = init_stack();
 	irlist = link_initialize();
 	datalist = link_initialize();
-
-	print_num = _lbl("$pnum");
-	print_true = _lbl("$ptrue");;
-	print_false = _lbl("$pfalse");;
-	print_null = _lbl("$pnull");;
 
 	link_push(irlist, _dir(".text"));
 	LINKEDLIST* first_element = irlist;
@@ -77,13 +67,14 @@ void ir_func(FUNCTION* func)
 void ir_head(HEAD* head)
 {
 	SYMBOL* symbol = getSymbol(head->table, head->id);
-	char* label = create_label(FUNC, symbol->name, func_count++);
+	char* label = create_label(FUNC, symbol->name, 0);
 	link_push(irlist, _lbl(label));
 	ir_par_decl_list(head->par_decl_list);
 }
 
 void ir_body(BODY* body)
 {
+	var_offset = 8;
 	ir_decl_list(body->decl_list); 	
 	function_prolog(body->table);
 	ir_statement_list(body->statement_list);
@@ -124,6 +115,7 @@ void ir_var_type(VAR_TYPE* var_type)
 	{
 		case PARAM:
 			var_offset += 8; // increment first
+			fprintf(stderr, "var_offset %s: %d\n", var_type->id, var_offset);
 			symbol->var_offset = var_offset;
 			//fprintf(stderr, "ir_var_type[PARAM]::offset %d\n", var_offset);
 		break;
@@ -173,8 +165,9 @@ void ir_declaration(DECLARATION* decl)
 		}
 		else
 		{
-			var_offset += 8;
+			fprintf(stderr, "decl::var_offset %d\n", var_offset);
 			symbol->var_offset = var_offset;
+			var_offset += 8;
 			link_push(irlist, _push(unknown, 0, 0, NULL));
 			//fprintf(stderr, "called ir_declaration_id::ELSE\n");
 		}
@@ -565,7 +558,7 @@ void ir_term(TERM* term)
 
 		ir_act_list(term->val.term_act_list.act_list);
 
-		if (depth == 0)
+		/*if (depth == 0)
 			link_push(irlist, _push(rbp, 16, 1, NULL)); // same scope
 		else if (depth > 0)
 		{
@@ -575,7 +568,7 @@ void ir_term(TERM* term)
 				link_push(irlist, _mov(r15, r15, 16, NULL, 1));
 			}
 			link_push(irlist, _push(r15, symbol->var_offset, 1, NULL));
-		}
+		}*/
 
 		link_push(irlist, _call(func_name));
 		link_push(irlist, _add(unknown, rsp, symbol->param_count * 8)); // add to stack counter to 'deallocate' local variables
@@ -591,8 +584,8 @@ void ir_term(TERM* term)
 		link_push(irlist, _push(unknown, 1, 0, NULL)); // push 1 to stack
 		link_push(irlist, _pop(rcx)); // pop 1 into rcx
 		link_push(irlist, _xor(rcx, rbx)); // xor 1 with rbx to negate value
-		link_push(irlist, _push(rbx, 0, 0, NULL)); // push rbx onto stack
 		link_push(irlist, _pop(rcx)); // restore rcx
+		link_push(irlist, _push(rbx, 0, 0, NULL)); // push rbx onto stack
 		break;
 	case TERM_ABSOLUTE:
 		ir_exp(term->val.exp);
@@ -609,7 +602,7 @@ void ir_term(TERM* term)
 			link_push(irlist, _cmp(rcx, rbx)); // compare
 			link_push(irlist, _jge(szlabel));
 			
-			link_push(irlist, _neg(rbx)); // needs to take register instead of char
+			link_push(irlist, _neg(rbx)); // if the value is negative, neg will multiply the value by -1, thus we will get a positive integer
 			link_push(irlist, _lbl(szlabel));
 
 			link_push(irlist, _push(rbx, 0, 0, NULL));
@@ -619,7 +612,7 @@ void ir_term(TERM* term)
 		{
 			link_push(irlist, _pop(rax));
 			link_push(irlist, _xor(rcx, rcx));
-			//link_push(irlist, _push()); //needs to rework this to push 16(%rax) 
+			//link_push(irlist, _push()); 
 		}
 
 		break;
@@ -663,7 +656,7 @@ void ir_var(VAR* var) // revisit this
 			{
 				link_push(irlist, _push(rbp, symbol->var_offset, 1, NULL)); // same scope
 			}
-			else if (depth > 0)
+			else if (depth > offset_depth)
 			{
 				link_push(irlist, _mov(rbp, r15, 16, NULL, 1)); // REVERSE IT
 				for (int i = 0; i < (depth - 1); i++)
@@ -676,16 +669,12 @@ void ir_var(VAR* var) // revisit this
 
 		break;
 	case VAR_ARRAY:
-		link_push(irlist, _push(rdi, 0, 0, NULL)); // backup registers
-		link_push(irlist, _push(rsi, 0, 0, NULL));
 		ir_var(var->val.var_array.var);
 		link_push(irlist, _pop(rsi));
 		ir_exp(var->val.var_array.exp);
 		link_push(irlist, _pop(rdi));
 		link_push(irlist, _inc(rdi)); // increment, first element is storing size
 		link_push(irlist, _raw("push (%rsi,rdi,8)")); // store the rdi'th element on the stack so we can pop it into a register later
-
-		//fprintf(stderr, "VAR_ARRAY\n"); // restore rsi, rdi afterward
 		break;
 	case VAR_RECORD:
 		fprintf(stderr, "VAR_RECORD\n");
@@ -709,6 +698,7 @@ void function_prolog(SYMBOL_TABLE* scope)
 	// CALLER
 	link_push(irlist, _push(rcx, 0, 0, NULL));
 	link_push(irlist, _push(rdx, 0, 0, NULL));
+	offset_depth++;
 }
 
 void function_epilog() // do we really need more registers when we're not doing any register allocation?
@@ -724,6 +714,7 @@ void function_epilog() // do we really need more registers when we're not doing 
 
 	link_push(irlist, _mov(rbp, rsp, 0, NULL, 0));
 	link_push(irlist, _pop(rbp));
+	offset_depth--;
 }
 
 void allocate_local_vars()

@@ -147,7 +147,7 @@ void ir_print(LINKEDLIST* ircode)
 			break;
 		case intCode:
 			printf("\tint ");
-			printf("$%s", temp->label);
+			printf("$%s", get_register_from_enum(temp->to));
 			printf("\n");
 			break;
 		case space:
