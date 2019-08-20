@@ -1,13 +1,11 @@
 #include <stdio.h>
 
 #include "ir_tree.h"
-#include "../symbols/stack.h"
 #include "../symbols/linkedlist.h"
 #include "../symbols/memory.h"
 
 #define OFFSET_SIZE 8
 
-STACK* function_stack;
 LINKEDLIST* irlist;
 LINKEDLIST* datalist;
 
@@ -22,7 +20,6 @@ IMMEDIATECODE* imc;
 LINKEDLIST* build_ir_tree(BODY* body, int unused)
 {
 	fprintf(stderr, "[ir_tree] began intermediate code generation\n");
-	function_stack = init_stack();
 	irlist = link_initialize();
 	datalist = link_initialize();
 
@@ -35,33 +32,28 @@ LINKEDLIST* build_ir_tree(BODY* body, int unused)
 	link_push(irlist, _dir(".globl main"));
 	link_push(irlist, _lbl("main"));
 	link_push(irlist, _push(rbp, 0, 0, NULL));
-	link_push(irlist, _mov(rsp, rbp, 0, NULL, 0));
+	link_push(irlist, _mov(rsp, rbp, 0, NULL, 0)); // initialize frame pointer
 
-	allocate_local_vars();
+	allocate_local_vars(); // allocate local vars in main scope
 
 	ir_statement_list(body->statement_list);
 
-	function_epilog(); // cleanup
+	function_epilog(); // cleanup or SEG fault!
 	link_push(irlist, _mov(unknown, rax, 0, NULL, 0)); // exit code 0 to signal a-ok
-	link_push(irlist, _ret());
+	link_push(irlist, _ret()); // ret returns what ever is in RAX
 
-	body->table->local_var_count = 0;
+	imc->local_var_count = 0;
 
 	//init heap here
 	data_section();
-	int data_length = link_length(datalist);
-	//if (data_length > 0)
-	//	link_push(datalist, _mov(heap_base, heap_free));
 
 	return irlist;
 }
 void ir_func(FUNCTION* func)
 {
 	imc->depth++; // we're going down
-	push_stack(function_stack, func);
 	ir_head(func->head);
 	ir_body(func->body);
-	pop_stack(function_stack);
 	imc->depth--;
 }
 void ir_head(HEAD* head)
@@ -109,24 +101,19 @@ void ir_var_decl_list(VAR_DECL_LIST* var_decl_list)
 
 void ir_var_type(VAR_TYPE* var_type)
 {
-	// TODO
 	SYMBOL* symbol = getSymbol(var_type->table, var_type->id);
 	switch(imc->kind)
 	{
 		case PARAM:
 			var_offset += 8; // increment first
-			fprintf(stderr, "var_offset %s: %d\n", var_type->id, var_offset);
 			symbol->var_offset = var_offset;
-			//fprintf(stderr, "ir_var_type[PARAM]::offset %d\n", var_offset);
 		break;
 		case LOCAL:
 			symbol->var_offset = -var_offset; // negate offset, we're looking inside the function, not outside
-			//fprintf(stderr, "ir_var_type[LOCAL]::offset %d\n", -var_offset);
 			imc->local_var_count += OFFSET_SIZE; // count amount of local vars so we can allocate room on the stack for assignments later
 			var_offset += OFFSET_SIZE; // increment here because rbp is at 0, first args must be at -8 and second -16 etc..
 		break;
 		default: // records & arrays aren't classified as params or local vars as they reside on the heap
-			// Heap it ?
 			link_push(datalist, var_type);
 		break;
 	}
@@ -155,21 +142,16 @@ void ir_declaration(DECLARATION* decl)
 	{
 	case DECLARATION_ID:
 		symbol = getSymbol(decl->table, decl->val.identifier.id);
-		//fprintf(stderr, "ir_declaration::%s type::%d\n", decl->val.identifier.id,decl->val.identifier.type->typeinfo->type);
 		if(symbol->kind == RECORD_MEMBER || decl->val.identifier.type->kind == RECORD_T)
 		{
-			// not a local var, maybe heap it
 			// TODO
-			//fprintf(stderr, "called SYMBOL_RECORD_MEMBER\n");
 			imc->kind = RECORD;
 		}
 		else
 		{
-			fprintf(stderr, "decl::var_offset %d\n", var_offset);
 			symbol->var_offset = var_offset;
-			var_offset += 8;
 			link_push(irlist, _push(unknown, 0, 0, NULL));
-			//fprintf(stderr, "called ir_declaration_id::ELSE\n");
+			var_offset += 8;
 		}
 		
 		break;
@@ -211,7 +193,6 @@ void ir_statement_list(STATEMENT_LIST* statement_list)
 void ir_statement(STATEMENT* statement)
 {
 	int ilbl = label_count++;
-	fprintf(stderr, "%d\n", statement->kind);
 	switch (statement->kind)
 	{
 	case RETURN:
@@ -295,11 +276,11 @@ void ir_statement(STATEMENT* statement)
 		}
 		else if (statement->val.stat_allocate.var->typeinfo->type == TYPE_RECORD)
 		{
-
+			// TODO
 		}
 		else
 		{
-			fprintf(stderr, "error\n");
+			fprintf(stderr, "error\n"); // can't allocate space for anything but records & arrays
 			exit(1);
 		}
 		break;
@@ -490,7 +471,6 @@ void ir_exp(EXP* exp) // term values will be on the stack, so pop them into regi
 		link_push(irlist, _push(rbx, 0, 0, NULL));
 		break;
 	case EXP_AND:
-		// TODO
 		ir_exp(exp->val.branches.right);
 
 		link_push(irlist, _pop(rbx));
@@ -512,7 +492,6 @@ void ir_exp(EXP* exp) // term values will be on the stack, so pop them into regi
 		link_push(irlist, _push(rbx, 0, 0, NULL));
 		break;
 	case EXP_OR:
-		// TODO
 		ir_exp(exp->val.branches.left);
 		link_push(irlist, _pop(rbx));
 		link_push(irlist, _mov(unknown, r9, 1, NULL, 0));
@@ -608,7 +587,7 @@ void ir_term(TERM* term)
 			link_push(irlist, _push(rbx, 0, 0, NULL));
 			link_push(irlist, _pop(rcx)); // restore rcx
 		}
-		else if (term->val.exp->typeinfo->type == TYPE_ARRAY)
+		else if (term->val.exp->typeinfo->type == TYPE_ARRAY) // Array indexing doesn't work, so this implementation won't eiter
 		{
 			link_push(irlist, _pop(rax));
 			link_push(irlist, _xor(rcx, rcx));
@@ -635,11 +614,11 @@ void ir_var(VAR* var) // revisit this
 {
 	SYMBOL* symbol = NULL;
 	int depth = 0;
-	switch (var->kind) // TODO
+	switch (var->kind)
 	{
 	case VAR_ID:
 		// Static link lookup
-		symbol = getSymbolDepth(var->table, var->id, &depth);
+		symbol = getSymbolDepth(var->table, var->id, &depth); // get the offset from base scope to current scopes 
 		if (!symbol)
 		{
 			fprintf(stderr, "[codegen error] can't retrieve symbol for %s @ %d\n", var->id, var->lineno);
@@ -656,20 +635,20 @@ void ir_var(VAR* var) // revisit this
 			{
 				link_push(irlist, _push(rbp, symbol->var_offset, 1, NULL)); // same scope
 			}
-			else if (depth > offset_depth)
+			else if (depth > offset_depth - depth) // get the difference in scopes
 			{
 				link_push(irlist, _mov(rbp, r15, 16, NULL, 1)); // REVERSE IT
-				for (int i = 0; i < (depth - 1); i++)
-				{
+				for (int i = 0; i < ((offset_depth - depth) - 1); i++) 	// iterator over the scope difference and get the value from previous
+				{														// frame/base pointer
 					link_push(irlist, _mov(r15, r15, 16, NULL, 1));
 				}
-				link_push(irlist, _push(r15, symbol->var_offset, 1, NULL));
+				link_push(irlist, _push(r15, symbol->var_offset, 1, NULL)); // finally the push the value to stack so we can pop it later
 			}
 		}
 
 		break;
 	case VAR_ARRAY:
-		ir_var(var->val.var_array.var);
+		ir_var(var->val.var_array.var); // Doesn't work...
 		link_push(irlist, _pop(rsi));
 		ir_exp(var->val.var_array.exp);
 		link_push(irlist, _pop(rdi));
@@ -677,7 +656,7 @@ void ir_var(VAR* var) // revisit this
 		link_push(irlist, _raw("push (%rsi,rdi,8)")); // store the rdi'th element on the stack so we can pop it into a register later
 		break;
 	case VAR_RECORD:
-		fprintf(stderr, "VAR_RECORD\n");
+		fprintf(stderr, "VAR_RECORD\n"); // TODO
 		break;
 	}
 }
@@ -685,9 +664,8 @@ void ir_var(VAR* var) // revisit this
 void function_prolog(SYMBOL_TABLE* scope)
 {
 	link_push(irlist, _push(rbp, 0, 0, NULL)); 		// save calling functions base pointer
-	link_push(irlist, _mov(rsp, rbp, 0, NULL, 0)); // move stack pointer into base pointer
-												// allocate x*8 amount of bytes for this funcs local variables
-	allocate_local_vars();					// so that we can refer to them on the stack
+	link_push(irlist, _mov(rsp, rbp, 0, NULL, 0)); 	// move stack pointer into base pointer
+	allocate_local_vars();
 	imc->local_var_count = 0;
 
 	// CALLEE
@@ -721,18 +699,16 @@ void allocate_local_vars()
 {
 	int varcount = imc->local_var_count / OFFSET_SIZE;
 	for (int i = 0; i < varcount; i++)
-	{
-		link_push(irlist, _push(unknown, 0, 0, NULL));
-	}
+		link_push(irlist, _push(unknown, 0, 0, NULL)); // push x amount of 0 values onto the stack so we can put values into their place later
 }
 
 char* create_label(LABEL_KIND kind, char* content, int offset)
 {
-	char* label = malloc(33 * sizeof(char));
+	char* label = malloc(30 * sizeof(char));
 	switch (kind)
 	{
 	case FUNC:
-		sprintf(label, "f_%s.%d", content, offset);
+		sprintf(label, "f_%s", content);
 		break;
 	case FLOW:
 		sprintf(label, "c_%s.%d", content, offset);

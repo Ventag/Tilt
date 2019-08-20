@@ -1,8 +1,5 @@
 #include "process.h"
 #include "collect.h"
-#include "../symbols/stack.h"
-
-STACK* function_stack;
 
 TYPEINFO* return_type;
 
@@ -21,7 +18,6 @@ void reset_depth_count()
 void verify(BODY* body)
 {
 	fprintf(stderr, "[verify] type verification started\n");
-	function_stack = init_stack();
 	verify_body(body);
 }
 

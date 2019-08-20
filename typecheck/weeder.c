@@ -1,13 +1,12 @@
 #include "weeder.h"
 #include "../expressions/tree.h"
-#include "../symbols/stack.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-STACK* stack;
-
+int found_return_statement = 0;
+int function_depth = 0;
 
 BODY* weeder (BODY* body)
 {
@@ -30,9 +29,8 @@ BODY* weed_body(BODY* body)
 
 FUNCTION* weed_func(FUNCTION* func)
 {
-    stack = init_stack();
+    function_depth++;
     func->body->statement_list->statement->retval = 0;
-    push_stack(stack, func);
 
     if(strcmp(func->head->id, func->tail->id) != 0)
     {
@@ -42,16 +40,15 @@ FUNCTION* weed_func(FUNCTION* func)
 
     weed_head(func->head);
     weed_body(func->body);
-    //if(func->body->statement_list->statement->retval == 0)
-	if(((FUNCTION*)peek_stack(stack))->found_return_statement == 0)
+
+    if(found_return_statement == 0)
     {
         fprintf(stderr, "Error at line %i: The function is missing a return statement\n", func->lineno);
         exit(1);
     }
-    pop_stack(stack);
 
+    function_depth--;
     return func;
-
 }
 
 VAR_DECL_LIST* weed_var_decl_list(VAR_DECL_LIST* var_decl_list)
@@ -189,15 +186,14 @@ STATEMENT* weed_stmt(STATEMENT* stmt)
     switch(stmt->kind)
     {
         case RETURN:
-        if (is_stack_empty(stack) )
+        if(function_depth == 0)
         {
 			fprintf(stderr, "Error @ %d - can't return outside a function\n");
             exit(1);
         }
         stmt->retval = 1;
-		((FUNCTION*)peek_stack(stack))->found_return_statement = 1;
+        found_return_statement = 1;
         return stmt;
-
         case IF:
             stmt->val.stat_if.stat = weed_stmt(stmt->val.stat_if.stat);
             
@@ -263,7 +259,3 @@ STATEMENT_ELSE* weed_stmt_else(STATEMENT_ELSE* stmt_else)
     }
     return stmt_else;
 }
-
-
-
-

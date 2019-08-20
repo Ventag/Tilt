@@ -62,8 +62,6 @@ SYMBOL *putSymbol(SYMBOL_TABLE *t, char* name, TYPEINFO* value)
 	s->name = name;
 	s->typeinfo = value;
 
-	fprintf(stderr, "putting symbol %s\n", name);
-
 	if (t->table[hash] == NULL)
 	{
 		t->table[hash] = s;

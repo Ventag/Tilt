@@ -56,7 +56,6 @@ typedef struct SYMBOL_TABLE
 {
 	SYMBOL *table[HashSize];
 	struct SYMBOL_TABLE *next;
-	int local_var_count;
 } SYMBOL_TABLE;
 
 int Hash(char *str);
