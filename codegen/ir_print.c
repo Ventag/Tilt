@@ -151,22 +151,17 @@ void ir_print(LINKEDLIST* ircode)
 			break;
 		case lea:
 			printf("\tleaq ");
-			//ir_print_args(temp->arg1);
 			printf(get_register_from_enum(temp->from));
 			printf(", ");
 			printf(get_register_from_enum(temp->to));
-			//ir_print_args(temp->arg2);
 			printf("\n");
 			break;
 		case inc:
-			//fprintf(stderr, "inc\n");
 			printf("\tincq ");
 			printf("%%%s", get_register_from_enum(temp->to));
-			//ir_print_args(temp->arg1);
 			printf("\n");
 			break;
 		case dec:
-			//fprintf(stderr, "dec\n");
 			printf("\tdecq "); 
 			printf("%s", get_register_from_enum(temp->to));
 			printf("\n");
@@ -177,52 +172,6 @@ void ir_print(LINKEDLIST* ircode)
 		iterator = iterator->next;
 	}
 }
-
-/*void ir_print_args(ARGS* arg)
-{
-	switch (arg->kind)
-	{
-	case args_addr:
-		//fprintf(stderr, "args_addr\n");
-		printf("%d(", arg->offset);
-		ir_print_args(arg->base);
-		printf(")");
-		break;
-	case args_reg:
-		//fprintf(stderr, "args_reg\n");
-		printf("%%%s", arg->name);
-		break;
-	case args_lbl:
-		//fprintf(stderr, "args_lbl\n");
-		printf(arg->name);
-		break;
-	case args_const:
-		//fprintf(stderr, "args_const\n");
-		printf("$%d", arg->offset);
-		break;
-	case args_temp:
-		//fprintf(stderr, "args_temp\n");
-		printf("%%temp%d", arg->identifier);
-		break;
-	case args_idx:
-		//fprintf(stderr, "args_idx\n");
-		if (arg->displace)
-			ir_print_args(arg->displace);
-		printf("(");
-		if (arg->base)
-			ir_print_args(arg->base);
-		printf(", ");
-		ir_print_args(arg->idx);
-		printf(",8)");
-		break;
-	case args_const_arg:
-		//fprintf(stderr, "args_const_arg\n");
-		printf("%d", arg->offset);
-		break;
-	default:
-		break;
-	}
-}*/
 
 char* get_register_from_enum(REGISTER reg)
 {
