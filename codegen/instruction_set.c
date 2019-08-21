@@ -200,14 +200,6 @@ INSTRUCTION* _neg(REGISTER reg)
 	return ir;
 }
 
-INSTRUCTION* _int(int val)
-{
-	INSTRUCTION* ir = NEW(INSTRUCTION);
-	ir->op = intCode;
-	ir->value = val;
-	return ir;
-}
-
 INSTRUCTION* _spc(char* label, int val)
 {
 	INSTRUCTION* ir = NEW(INSTRUCTION);

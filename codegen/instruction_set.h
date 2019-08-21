@@ -49,7 +49,6 @@ INSTRUCTION* _jge(char*);
 INSTRUCTION* _jmp(char*);
 INSTRUCTION* _not(char*);
 INSTRUCTION* _neg(REGISTER);
-INSTRUCTION* _int(int);
 INSTRUCTION* _spc(char*, int);
 INSTRUCTION* _lea(int, REGISTER);
 INSTRUCTION* _inc(REGISTER);
