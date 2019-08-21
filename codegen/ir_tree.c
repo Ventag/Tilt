@@ -160,16 +160,10 @@ void ir_declaration(DECLARATION* decl)
 		break;
 	case DECLARATION_VAR:
 		var_offset = 8; // reset offset
-		//fprintf(stderr, "DECLARATION_VAR\n");
 		if (decl->symbol->kind == RECORD_MEMBER)
-		{
 			imc->kind = RECORD;
-		}
-
-		if (decl->val.var_decl_list->var_type->type->typeinfo->type == TYPE_ARRAY)
-		{
+		else if (decl->val.var_decl_list->var_type->type->typeinfo->type == TYPE_ARRAY)
 			imc->kind = ARRAY;
-		}
 
 		ir_var_decl_list(decl->val.var_decl_list);
 		break;
@@ -251,28 +245,18 @@ void ir_statement(STATEMENT* statement)
 	case ALLOCATE:
 		if (statement->val.stat_allocate.var->typeinfo->type == TYPE_ARRAY)
 		{
-			link_push(irlist, _push(rax, 0, 0, NULL)); // save rax
-			link_push(irlist, _push(rcx, 0, 0, NULL)); // save rcx
-			link_push(irlist, _push(rdx, 0, 0, NULL)); // save rdx
-			link_push(irlist, _push(rbx, 0, 0, NULL)); // save rbx
-
 			ir_var(statement->val.stat_allocate.var);
 			link_push(irlist, _pop(rcx)); // pop var into rcx
-			link_push(irlist, _mov(unknown, rax, 0, "heap_next", 0));
-			link_push(irlist, _mov(rax, rcx, 0, NULL, 0));
+			//link_push(irlist, _mov(unknown, rax, 0, "heap_next", 0));
+			//link_push(irlist, _mov(rax, rcx, 0, NULL, 0));
 
 			ir_exp(statement->val.stat_allocate.length); // pop length into rdx
 			link_push(irlist, _pop(rdx));
-			link_push(irlist, _xor(rbx, rbx));
-			link_push(irlist, _raw("mov rdx, (rax,rbx,8)")); // move array size to 1st index
+			//link_push(irlist, _xor(rbx, rbx)); // clear register to get 0
+			//link_push(irlist, _raw("movq %rdx, (%rcx,%rbx,8)")); // move array size to 1st index
 			link_push(irlist, _inc(rdx));
-			link_push(irlist, _raw("imul $8, rdx"));  // get size of array in bytes
-			link_push(irlist, _raw("add %rdx, heap_next"));
-
-			link_push(irlist, _pop(rbx)); // restore rbx
-			link_push(irlist, _pop(rdx)); // restore rdx
-			link_push(irlist, _pop(rcx)); // restore rcx
-			link_push(irlist, _pop(rax)); // restore rax
+			link_push(irlist, _raw("imulq $8, %rdx"));  // get size of array in bytes
+			link_push(irlist, _raw("addq %rdx, heap_next"));
 		}
 		else if (statement->val.stat_allocate.var->typeinfo->type == TYPE_RECORD)
 		{
@@ -291,9 +275,8 @@ void ir_statement(STATEMENT* statement)
 		ir_var(statement->val.stat_assign.var);
 		link_push(irlist, _pop(rcx)); // store var in rcx
 		if (statement->val.stat_assign.var->kind == VAR_ARRAY)
-		{
-			//link_push(irlist, _mov(rbx, rcx, 0, NULL, 0)); // address is pushed to the stack, we just pop it into rcx
-			link_push(irlist, _raw("mov rbx, (rcx)")); // raw because no time to widen _mov function to deref pointers...
+		{												 // address is pushed to the stack, we just pop it into rcx
+			link_push(irlist, _raw("mov %rbx, (%rcx)")); // raw because no time to widen _mov function to deref pointers...
 		}
 		if (statement->val.stat_assign.var->kind == VAR_ID)
 		{
@@ -302,7 +285,7 @@ void ir_statement(STATEMENT* statement)
 		}
 		link_push(irlist, _pop(rbx));
 		break;
-	case IF: // TODO
+	case IF:
 		link_push(irlist, _push(rax, 0, 0, NULL)); // backup rax
 		char* lbl_else = create_label(FLOW, "else", ilbl);
 		char* lbl_end = create_label(FLOW, "end", ilbl);
@@ -311,6 +294,7 @@ void ir_statement(STATEMENT* statement)
 		link_push(irlist, _push(r10, 0, 0, NULL)); // backup r10
 		link_push(irlist, _mov(unknown, r10, 1, NULL, 0)); // move 1 into r10
 		link_push(irlist, _cmp(r10, rax)); // cmp 1 to rax, is condition true?
+		link_push(irlist, _pop(r10));
 
 		if (statement->val.stat_if.optional_else->kind == ELSE_INACTIVE)
 			link_push(irlist, _jne(lbl_end));
@@ -326,7 +310,7 @@ void ir_statement(STATEMENT* statement)
 			ir_statement(statement->val.stat_if.optional_else->statement); // generate the code for the else case
 		}
 		link_push(irlist, _lbl(lbl_end));
-		link_push(irlist, _pop(rax));
+		link_push(irlist, _pop(rax)); // restore rax
 		break;
 	case WHILE:
 		link_push(irlist, _push(rax, 0, 0, NULL)); // backup rax
@@ -531,13 +515,12 @@ void ir_term(TERM* term)
 		
 		break;
 	case TERM_ACT_LIST:
-		// refer to old implementation
 		symbol = getSymbolDepth(term->table, term->val.term_act_list.id, &depth);
 		char* func_name = create_label(FUNC, symbol->name, 0);
 
 		ir_act_list(term->val.term_act_list.act_list);
 
-		/*if (depth == 0)
+		if (depth == 0)
 			link_push(irlist, _push(rbp, 16, 1, NULL)); // same scope
 		else if (depth > 0)
 		{
@@ -547,7 +530,7 @@ void ir_term(TERM* term)
 				link_push(irlist, _mov(r15, r15, 16, NULL, 1));
 			}
 			link_push(irlist, _push(r15, symbol->var_offset, 1, NULL));
-		}*/
+		}
 
 		link_push(irlist, _call(func_name));
 		link_push(irlist, _add(unknown, rsp, symbol->param_count * 8)); // add to stack counter to 'deallocate' local variables
@@ -648,12 +631,16 @@ void ir_var(VAR* var) // revisit this
 
 		break;
 	case VAR_ARRAY:
-		ir_var(var->val.var_array.var); // Doesn't work...
+		link_push(irlist, _push(rdi, 0, 0, NULL)); // backup registers
+		link_push(irlist, _push(rsi, 0, 0, NULL));
+		ir_var(var->val.var_array.var);
 		link_push(irlist, _pop(rsi));
 		ir_exp(var->val.var_array.exp);
 		link_push(irlist, _pop(rdi));
 		link_push(irlist, _inc(rdi)); // increment, first element is storing size
 		link_push(irlist, _raw("push (%rsi,rdi,8)")); // store the rdi'th element on the stack so we can pop it into a register later
+
+		//fprintf(stderr, "VAR_ARRAY\n"); // restore rsi, rdi afterward
 		break;
 	case VAR_RECORD:
 		fprintf(stderr, "VAR_RECORD\n"); // TODO

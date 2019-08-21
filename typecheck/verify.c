@@ -3,7 +3,7 @@
 
 TYPEINFO* return_type;
 
-int depth_count = 1;
+int depth_count = 0;
 
 void increment_depth_count()
 {
@@ -12,7 +12,7 @@ void increment_depth_count()
 
 void reset_depth_count()
 {
-	depth_count = 1;
+	depth_count = 0;
 }
 
 void verify(BODY* body)
@@ -183,7 +183,23 @@ void verify_statement(STATEMENT* statement)
 		TODO: Handle record & array assignments here
 		*/
 
-		if (left->type != right->type)
+		if (left->type == TYPE_ARRAY)
+		{
+			fprintf(stderr, "before: %d\n", left->type);
+
+			TYPEINFO* iter = left;
+			while (iter->array_next_value)
+				iter = iter->array_next_value;
+
+			left = iter;
+			fprintf(stderr, "after: %d\n", left->type);
+
+			if (left->type != right->type && right->type != TYPE_NULL)
+			{
+				fprintf(stderr, "no can do");
+			}
+		}
+		else if (left->type != right->type)
 		{
 			fprintf(stderr, "[typechecking error] this needs rework @ %d\n", statement->lineno);
 			fprintf(stderr, "left: %d right %d\n", left->type, right->type);
@@ -460,26 +476,21 @@ void verify_var(VAR* var)
 			exit(1);
 		}
 
-		/*
-		TODO: Compare array base types
-		*/
-
 		TYPEINFO* type = var->val.var_array.var->typeinfo;
-		int length = 1;
+		int length = 0;
 		while (type->array_next_value != NULL)
 		{
 			length++;
 			type = type->array_next_value;
 		}
-		type->length = length;
 
-		if (depth_count == length)
+		if (depth_count == length) // if we're at start of the array
 			var->typeinfo = type;
 		else
 			var->typeinfo = var->val.var_array.var->typeinfo;
 
-		fprintf(stderr, "var: %d vs base %d\n", var->val.var_array.var->typeinfo->type, type->type);
-
+		//fprintf(stderr, "var: %d vs base %d\n", var->val.var_array.var->typeinfo->type, type->type);
+		reset_depth_count();
 		break;
 	case VAR_RECORD:
 		verify_var(var->val.var_record.var);

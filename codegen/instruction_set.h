@@ -5,7 +5,7 @@ typedef enum OPCODE
 {
 	raw, dir, lbl, mov, call, push, pop,
 	add, sub, ret, xor, div_, mul, cmp, jne,
-	je, jmp, jge, jle, jl, jg, not, neg, intCode,
+	je, jmp, jge, jle, jl, jg, not, neg,
 	space, lea, inc, dec
 } OPCODE;
 

@@ -35,7 +35,6 @@ typedef struct TYPEINFO
 	struct SYMBOL_TABLE* child_scope;
 	struct VAR_DECL_LIST* records;
 
-	int length;
 	TYPES type;
 } TYPEINFO;
 

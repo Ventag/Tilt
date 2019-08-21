@@ -27,8 +27,6 @@ void ir_print(LINKEDLIST* ircode)
 			printf("\tpush ");
 			if (temp->to == unknown)
 			{
-			//else if (temp->label && strlen(temp->label) > 1)
-			//	printf("%s", temp->label);
 				if (temp->label)
 					printf("%s", temp->label);
 				else
@@ -83,7 +81,7 @@ void ir_print(LINKEDLIST* ircode)
 			printf("\n");
 			break;
 		case div_:
-			printf("\tidivq %%%s, %%%s", get_register_from_enum(temp->from), get_register_from_enum(temp->to));
+			printf("\tidivq %%%s", get_register_from_enum(temp->from));
 			printf("\n");
 			break;
 		case call:
@@ -168,7 +166,7 @@ void ir_print(LINKEDLIST* ircode)
 		case inc:
 			//fprintf(stderr, "inc\n");
 			printf("\tincq ");
-			printf("%s", get_register_from_enum(temp->to));
+			printf("%%%s", get_register_from_enum(temp->to));
 			//ir_print_args(temp->arg1);
 			printf("\n");
 			break;

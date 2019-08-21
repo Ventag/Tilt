@@ -104,13 +104,11 @@ TYPEINFO* collect_type(TYPE* type, SYMBOL_TABLE* _st)
 	case RECORD_T: // create a symbol table for each record
 		type->typeinfo = create_type(TYPE_RECORD);
 		type->typeinfo->child_scope = scopeSymbolTable(_st);
-		collect_var_decl_list(type->val.var_decl_list, type->typeinfo->child_scope); // count members
-		type->typeinfo->length = args_count; // count stored in args_count
-		reset_args_count();
+		collect_var_decl_list(type->val.var_decl_list, type->typeinfo->child_scope);
+		reset_args_count(); // just cleanup here even though we dont use args count, collect_var_decl_list increments it automatically.
 		type->typeinfo->records = type->val.var_decl_list;
 		break;
 	default:
-		//fprintf(stderr, "error: collect_type [unknown type]\n");
 		exit(1);
 		break;
 	}
@@ -136,7 +134,7 @@ void collect_par_decl_list(PAR_DECL_LIST* pdecl, SYMBOL_TABLE* _st)
 	switch (pdecl->kind)
 	{
 	case PAR_DECL_LIST_POPLUATED:
-		/*count +=*/ collect_var_decl_list(pdecl->var_decl_list, _st);
+		collect_var_decl_list(pdecl->var_decl_list, _st);
 		increment_args_count();
 		break;
 	case PAR_DECL_LIST_EMPTY:
@@ -167,8 +165,8 @@ void collect_var_type(VAR_TYPE* vtype, SYMBOL_TABLE* _st)
 	// Acquire the type of the variable
 	TYPEINFO* typeinfo = collect_type(vtype->type, _st);
 
-	if (typeinfo->type == TYPE_UNKNOWN) // Only happens if vtype->type is ID and it cant be found in local/outer scope
-		unknown_user_types++;
+	if (typeinfo->type == TYPE_UNKNOWN) // Only happens if vtype->type is ID and it cant be found in any hierachical scopes
+		unknown_user_types++; // we'll find it during processing of unknown types ( maybe )
 
 	vtype->symbol = putSymbol(_st, vtype->id, typeinfo);
 }
