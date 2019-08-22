@@ -362,7 +362,9 @@ void verify_term(TERM* term)
 		term->typeinfo = term->val.var->typeinfo;
 		break;
 	case TERM_ACT_LIST:
-		param_count = verify_act_list(term->val.term_act_list.act_list);
+		verify_act_list(term->val.term_act_list.act_list);
+		int param_count = depth_count;
+		reset_depth_count();
 		SYMBOL* symbol = getSymbol(term->table, term->val.term_act_list.id);
 		if (!symbol || symbol->typeinfo->type != TYPE_FUNC)
 		{
@@ -516,46 +518,30 @@ void verify_var(VAR* var)
 	}
 }
 
-int verify_act_list(ACT_LIST* act_list)
+void verify_act_list(ACT_LIST* act_list)
 {
-	int param_count = 0;
 	switch (act_list->kind)
 	{
 	case ACT_LIST_EMPTY:
-		return 0;
 		break;
 	case ACT_LIST_POPULATED:
 		return verify_exp_list(act_list->exp_list);
 		break;
 	}
-	return param_count;
+	increment_depth_count();
 }
 
-int verify_exp_list(EXP_LIST* exp_list)
+void verify_exp_list(EXP_LIST* exp_list)
 {
-	int param_count = 1;
 	switch (exp_list->kind)
 	{
 	case EXPRESSION_LIST:
-		param_count += verify_exp_list(exp_list->exp_list);
+		verify_exp_list(exp_list->exp_list);
 		verify_exp(exp_list->exp);
 		break;
 	case EXPRESSION:
 		verify_exp(exp_list->exp);
 		break;
 	}
-	return param_count;
-}
-
-int get_array_length(TYPEINFO* symbol_value)
-{
-	int length = 1;
-	TYPEINFO* copy = symbol_value;
-	while (copy->array_next_value)
-	{
-		length++;
-		copy = copy->array_next_value;
-	}
-
-	return length;
+	increment_depth_count();
 }

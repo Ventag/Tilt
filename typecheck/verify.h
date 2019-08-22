@@ -25,8 +25,7 @@ void verify_exp(EXP*);
 void verify_term(TERM*);
 void verify_var(VAR*);
 
-int verify_act_list(ACT_LIST*);
-int verify_exp_list(EXP_LIST*);
-int get_array_length(SYMBOL_VALUE*);
+void verify_act_list(ACT_LIST*);
+void verify_exp_list(EXP_LIST*);
 
 #endif
