@@ -16,7 +16,6 @@ typedef struct IMMEDIATECODE
 		ARRAY
 	}kind;
 
-	int onheap;
 	int offset;
 	int local_var_count;
 	int depth;
