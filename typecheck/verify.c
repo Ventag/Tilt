@@ -128,9 +128,12 @@ void verify_statement(STATEMENT* statement)
 	case RETURN:
 		verify_exp(statement->val.stat_return.exp);
 		left = statement->val.stat_return.exp->typeinfo;
-		if (left->type != return_type->type)
+		if (return_type == NULL || left->type != return_type->type)
 		{
-			fprintf(stderr, "[verify error] function return type mistmatch @ %d\nleft: %d\nright: %d\n", statement->lineno, left->type, return_type->type);
+			if(return_type == NULL)
+				fprintf(stderr, "[verify error] couldn't return, are you trying to return outside a function? @ %d\n", statement->lineno);
+			else
+				fprintf(stderr, "[verify error] function return type mistmatch @ %d\nleft: %d\nright: %d\n", statement->lineno, left->type, return_type->type);
 			exit(1);
 		}
 		break;
