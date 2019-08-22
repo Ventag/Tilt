@@ -134,8 +134,8 @@ void collect_par_decl_list(PAR_DECL_LIST* pdecl, SYMBOL_TABLE* _st)
 	switch (pdecl->kind)
 	{
 	case PAR_DECL_LIST_POPLUATED:
-		collect_var_decl_list(pdecl->var_decl_list, _st);
 		increment_args_count();
+		collect_var_decl_list(pdecl->var_decl_list, _st);
 		break;
 	case PAR_DECL_LIST_EMPTY:
 		break;
@@ -148,9 +148,9 @@ void collect_var_decl_list(VAR_DECL_LIST* vdecl, SYMBOL_TABLE* _st)
 	switch (vdecl->kind)
 	{
 	case VDECL_LIST:
+		increment_args_count();
 		collect_var_type(vdecl->var_type, _st);
 		collect_var_decl_list(vdecl->var_decl_list, _st);
-		increment_args_count();
 		break;
 	case VDECL_TYPE:
 		collect_var_type(vdecl->var_type, _st);

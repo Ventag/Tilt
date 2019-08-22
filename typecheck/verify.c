@@ -3,16 +3,18 @@
 
 TYPEINFO* return_type;
 
-int depth_count = 0;
+int depth_count = 1;
 
 void increment_depth_count()
 {
-	depth_count++;
+	fprintf(stderr, "%d vs ", depth_count);
+	depth_count += 1;
+	fprintf(stderr, "%d\n", depth_count);
 }
 
 void reset_depth_count()
 {
-	depth_count = 0;
+	depth_count = 1;
 }
 
 void verify(BODY* body)
@@ -351,7 +353,6 @@ void verify_exp(EXP* exp)
 
 void verify_term(TERM* term)
 {
-	int param_count = 0;
 	switch (term->kind)
 	{
 	case TERM_VAR:
@@ -360,8 +361,6 @@ void verify_term(TERM* term)
 		break;
 	case TERM_ACT_LIST:
 		verify_act_list(term->val.term_act_list.act_list);
-		int param_count = depth_count;
-		reset_depth_count();
 		SYMBOL* symbol = getSymbol(term->table, term->val.term_act_list.id);
 		if (!symbol || symbol->typeinfo->type != TYPE_FUNC)
 		{
@@ -369,9 +368,9 @@ void verify_term(TERM* term)
 			exit(1);
 		}
 
-		if (param_count < symbol->param_count || param_count > symbol->param_count)
+		if (depth_count < symbol->param_count || depth_count > symbol->param_count)
 		{
-			fprintf(stderr, "[verify error] arguments count mismatch for function %d vs %d @ %d\n", param_count, symbol->param_count, term->lineno);
+			fprintf(stderr, "[verify error] arguments count mismatch for function %s : %d vs %d @ %d\n", term->val.term_act_list.id, depth_count, symbol->param_count, term->lineno);
 			exit(1);
 		}
 
@@ -510,10 +509,9 @@ void verify_act_list(ACT_LIST* act_list)
 	case ACT_LIST_EMPTY:
 		break;
 	case ACT_LIST_POPULATED:
-		verify_exp_list(act_list->exp_list);
+		verify_exp_list();
 		break;
 	}
-	//increment_depth_count();
 }
 
 void verify_exp_list(EXP_LIST* exp_list)
@@ -521,12 +519,12 @@ void verify_exp_list(EXP_LIST* exp_list)
 	switch (exp_list->kind)
 	{
 	case EXPRESSION_LIST:
-		verify_exp_list(exp_list->exp_list);
 		verify_exp(exp_list->exp);
+		verify_exp_list(exp_list->exp_list);
 		break;
 	case EXPRESSION:
+		increment_depth_count();
 		verify_exp(exp_list->exp);
 		break;
 	}
-	increment_depth_count();
 }
