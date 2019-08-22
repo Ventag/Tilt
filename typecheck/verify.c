@@ -357,7 +357,7 @@ void verify_term(TERM* term)
 
 		if (param_count < symbol->param_count || param_count > symbol->param_count)
 		{
-			fprintf(stderr, "[verify error] arguments count mismatch for function %s : %d vs %d @ %d\n", term->val.term_act_list.id, depth_count, symbol->param_count, term->lineno);
+			fprintf(stderr, "[verify error] arguments count mismatch for function %s : %d vs %d @ %d\n", term->val.term_act_list.id, param_count, symbol->param_count, term->lineno);
 			exit(1);
 		}
 
