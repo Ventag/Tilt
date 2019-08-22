@@ -185,18 +185,12 @@ void verify_statement(STATEMENT* statement)
 
 		if (left->type == TYPE_ARRAY)
 		{
-			fprintf(stderr, "before: %d\n", left->type);
-
-			TYPEINFO* iter = left;
-			while (iter->array_next_value)
-				iter = iter->array_next_value;
-
-			left = iter;
-			fprintf(stderr, "after: %d\n", left->type);
+			left = left->array_next_value;
 
 			if (left->type != right->type && right->type != TYPE_NULL)
 			{
-				fprintf(stderr, "no can do");
+				fprintf(stderr, "[typechecking error] array type mismatch @ %d\n", statement->lineno);
+				exit(1);
 			}
 		}
 		else if (left->type != right->type)
@@ -462,7 +456,6 @@ void verify_var(VAR* var)
 
 		break;
 	case VAR_ARRAY:
-		increment_depth_count();
 		verify_var(var->val.var_array.var);
 		verify_exp(var->val.var_array.exp);
 
@@ -479,20 +472,9 @@ void verify_var(VAR* var)
 		}
 
 		TYPEINFO* type = var->val.var_array.var->typeinfo;
-		int length = 0;
-		while (type->array_next_value != NULL)
-		{
-			length++;
-			type = type->array_next_value;
-		}
+		type = type->array_next_value;
 
-		if (depth_count == length) // if we're at start of the array
-			var->typeinfo = type;
-		else
-			var->typeinfo = var->val.var_array.var->typeinfo;
-
-		//fprintf(stderr, "var: %d vs base %d\n", var->val.var_array.var->typeinfo->type, type->type);
-		reset_depth_count();
+		var->typeinfo = type;
 		break;
 	case VAR_RECORD:
 		verify_var(var->val.var_record.var);
@@ -525,10 +507,10 @@ void verify_act_list(ACT_LIST* act_list)
 	case ACT_LIST_EMPTY:
 		break;
 	case ACT_LIST_POPULATED:
-		return verify_exp_list(act_list->exp_list);
+		verify_exp_list(act_list->exp_list);
 		break;
 	}
-	increment_depth_count();
+	//increment_depth_count();
 }
 
 void verify_exp_list(EXP_LIST* exp_list)

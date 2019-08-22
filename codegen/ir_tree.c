@@ -520,18 +520,6 @@ void ir_term(TERM* term)
 
 		ir_act_list(term->val.term_act_list.act_list);
 
-		if (depth == 0)
-			link_push(irlist, _push(rbp, 16, 1, NULL)); // same scope
-		else if (depth > 0)
-		{
-			link_push(irlist, _mov(rbp, r15, 16, NULL, 1)); // reverse the order
-			for (int i = 0; i < (depth - 1); i++)
-			{
-				link_push(irlist, _mov(r15, r15, 16, NULL, 1));
-			}
-			link_push(irlist, _push(r15, symbol->var_offset, 1, NULL));
-		}
-
 		link_push(irlist, _call(func_name));
 		link_push(irlist, _add(unknown, rsp, symbol->param_count * 8)); // add to stack counter to 'deallocate' local variables
 		link_push(irlist, _push(rax, 0, 0, NULL));
