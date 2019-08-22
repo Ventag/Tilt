@@ -7,9 +7,7 @@ int depth_count = 1;
 
 void increment_depth_count()
 {
-	fprintf(stderr, "%d vs ", depth_count);
 	depth_count += 1;
-	fprintf(stderr, "%d\n", depth_count);
 }
 
 void reset_depth_count()
