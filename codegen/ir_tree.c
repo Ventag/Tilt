@@ -274,7 +274,6 @@ void ir_statement(STATEMENT* statement)
 		link_push(irlist, _push(rbx, 0, 0, NULL)); // backup rbx
 		ir_exp(statement->val.stat_assign.exp);
 		link_push(irlist, _pop(rbx)); // store exp in rbx
-		fprintf(stderr, "kind: %d\n", statement->val.stat_assign.var->kind);
 		if (statement->val.stat_assign.var->kind == VAR_ARRAY)
 		{		
 			ir_var(statement->val.stat_assign.var); // only do the var in here to move it to stack, we already know regular vars offset
