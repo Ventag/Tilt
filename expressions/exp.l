@@ -3,7 +3,6 @@
 #include <string.h>
 
 int comment = 0;
-int errors = 0;
 extern int lineno;
 extern int fileno();
 %}
