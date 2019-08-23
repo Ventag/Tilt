@@ -347,9 +347,9 @@ void verify_term(TERM* term)
 		term->typeinfo = term->val.var->typeinfo;
 		break;
 	case TERM_ACT_LIST:
-		param_count = verify_act_list(term->val.term_act_list.act_list);
+		verify_act_list(term->val.term_act_list.act_list, &param_count);
 		SYMBOL* symbol = getSymbol(term->table, term->val.term_act_list.id);
-		if (!symbol || symbol->typeinfo->type != TYPE_FUNC)
+		if (!param_count || symbol->typeinfo->type != TYPE_FUNC)
 		{
 			fprintf(stderr, "[verify error] undefined function %d @ %d\n", symbol->typeinfo->type, term->lineno);
 			exit(1);
@@ -488,32 +488,29 @@ void verify_var(VAR* var)
 	}
 }
 
-int verify_act_list(ACT_LIST* act_list)
+void verify_act_list(ACT_LIST* act_list, int* test)
 {
-	int count = 0;
 	switch (act_list->kind)
 	{
 	case ACT_LIST_EMPTY:
 		break;
 	case ACT_LIST_POPULATED:
-		count += verify_exp_list(act_list->exp_list);
+		verify_exp_list(act_list->exp_list, test);
 		break;
 	}
-	return count;
 }
 
-int verify_exp_list(EXP_LIST* exp_list)
+void verify_exp_list(EXP_LIST* exp_list, int* test)
 {
-	int count = 1;
+	(*test)++;
 	switch (exp_list->kind)
 	{
 	case EXPRESSION_LIST:
 		verify_exp(exp_list->exp);
-		count += verify_exp_list(exp_list->exp_list);
+		verify_exp_list(exp_list->exp_list, test);
 		break;
 	case EXPRESSION:
 		verify_exp(exp_list->exp);
 		break;
 	}
-	return count;
 }
