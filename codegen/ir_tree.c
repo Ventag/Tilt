@@ -113,7 +113,6 @@ void ir_var_type(VAR_TYPE* var_type)
 		case LOCAL:			
 			symbol->var_offset = -var_offset; // negate offset, we're looking inside the function, not outside
 			imc->local_var_count += OFFSET_SIZE; // count amount of local vars so we can allocate room on the stack for assignments later
-			fprintf(stderr, "asmr: %s:%d\n", var_type->id, var_offset);
 			var_offset += OFFSET_SIZE; // increment here because rbp is at 0, first args must be at -8 and second -16 etc..
 		break;
 		default: // records & arrays aren't classified as params or local vars as they reside on the heap
