@@ -2,5 +2,5 @@ var f:bool;
 var t:bool;
 f=false;
 t=true;
-write f;
-write t;
+write f; #Expected false
+write t; #Expected true

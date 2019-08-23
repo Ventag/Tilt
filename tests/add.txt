@@ -3,4 +3,4 @@ var c:int;
 c=a+b;
 return c;
 end test
-write test(10,20);
+write test(10,20); #Expected output 30

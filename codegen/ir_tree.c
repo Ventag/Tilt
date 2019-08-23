@@ -28,6 +28,7 @@ LINKEDLIST* build_ir_tree(BODY* body, int unused)
 	imc = calloc(1, sizeof(IMMEDIATECODE));
 
 	ir_decl_list(body->decl_list);
+	var_offset = 8;
 
 	link_push(irlist, _dir(".globl main"));
 	link_push(irlist, _lbl("main"));
@@ -68,6 +69,7 @@ void ir_body(BODY* body)
 {
 	var_offset = 8;
 	ir_decl_list(body->decl_list); 	
+	var_offset = 8;
 	function_prolog(body->table);
 	ir_statement_list(body->statement_list);
 }
@@ -108,9 +110,10 @@ void ir_var_type(VAR_TYPE* var_type)
 			var_offset += 8; // increment first
 			symbol->var_offset = var_offset;
 		break;
-		case LOCAL:
+		case LOCAL:			
 			symbol->var_offset = -var_offset; // negate offset, we're looking inside the function, not outside
 			imc->local_var_count += OFFSET_SIZE; // count amount of local vars so we can allocate room on the stack for assignments later
+			fprintf(stderr, "asmr: %s:%d\n", var_type->id, var_offset);
 			var_offset += OFFSET_SIZE; // increment here because rbp is at 0, first args must be at -8 and second -16 etc..
 		break;
 		default: // records & arrays aren't classified as params or local vars as they reside on the heap
@@ -129,7 +132,6 @@ void ir_decl_list(DECL_LIST* decl_list)
 
 		ir_declaration(decl_list->declaration);
 		ir_decl_list(decl_list->decl_list);
-		var_offset = 8;
 	case DECL_LIST_EMPTY:
 		break;
 	}
@@ -159,7 +161,9 @@ void ir_declaration(DECLARATION* decl)
 		ir_func(decl->val.function);
 		break;
 	case DECLARATION_VAR:
-		var_offset = 8; // reset offset
+		if(imc->kind != LOCAL)  // reset offset
+			var_offset = 8; 	// we don't want to reset the offset if we're a local variable
+
 		if (decl->symbol->kind == RECORD_MEMBER)
 			imc->kind = RECORD;
 		else if (decl->val.var_decl_list->var_type->type->typeinfo->type == TYPE_ARRAY)
@@ -208,17 +212,16 @@ void ir_statement(STATEMENT* statement)
 			break;
 		case TYPE_BOOL:
 			ir_exp(statement->val.exp);
-			link_push(irlist, _pop(rax));
+			link_push(irlist, _pop(rcx));
 			int labelid = label_count++;
 			char* bend = create_label(FLOW, "pbool", labelid);
 			char* btrue = create_label(FLOW, "ptrue", labelid);
 
-			link_push(irlist, _push(r10, 0, 0, NULL)); // backup r10
 			link_push(irlist, _mov(unknown, r10, 1, NULL, 0));
-			link_push(irlist, _cmp(r10, rax));
-			link_push(irlist, _pop(r10)); // restore r10
+			link_push(irlist, _cmp(r10, rcx));
 			link_push(irlist, _je(btrue)); // if rax is equal 1, e.g. it is true, jmp to true case
 
+			link_push(irlist, _push(rax, 0, 0, NULL)); // false case
 			link_push(irlist, _mov(unknown, rdi, 0, "$pfalse", 0)); // false case
 			link_push(irlist, _mov(unknown, rsi, 0, "$pfalse", 0));
 			link_push(irlist, _mov(unknown, rax, 0, NULL, 0));
@@ -272,15 +275,18 @@ void ir_statement(STATEMENT* statement)
 		link_push(irlist, _push(rbx, 0, 0, NULL)); // backup rbx
 		ir_exp(statement->val.stat_assign.exp);
 		link_push(irlist, _pop(rbx)); // store exp in rbx
-		ir_var(statement->val.stat_assign.var);
-		link_push(irlist, _pop(rcx)); // store var in rcx
+		fprintf(stderr, "kind: %d\n", statement->val.stat_assign.var->kind);
 		if (statement->val.stat_assign.var->kind == VAR_ARRAY)
-		{												 // address is pushed to the stack, we just pop it into rcx
+		{		
+			ir_var(statement->val.stat_assign.var); // only do the var in here to move it to stack, we already know regular vars offset
+			link_push(irlist, _pop(rcx)); // store var in rcx												 // address is pushed to the stack, we just pop it into rcx
 			link_push(irlist, _raw("mov %rbx, (%rcx)")); // raw because no time to widen _mov function to deref pointers...
 		}
 		if (statement->val.stat_assign.var->kind == VAR_ID)
 		{
 			SYMBOL* symbol = getSymbol(statement->table, statement->val.stat_assign.var->id);
+			//link_push(irlist, _mov(rbx, rcx, 0, NULL, 0));
+			//link_push(irlist, _raw("#here"));
 			link_push(irlist, _mov(rbx, rbp, symbol->var_offset, NULL, 0));
 		}
 		link_push(irlist, _pop(rbx));
@@ -581,7 +587,7 @@ void ir_term(TERM* term)
 	}
 }
 
-void ir_var(VAR* var) // revisit this
+void ir_var(VAR* var)
 {
 	SYMBOL* symbol = NULL;
 	int depth = 0;
@@ -589,7 +595,7 @@ void ir_var(VAR* var) // revisit this
 	{
 	case VAR_ID:
 		// Static link lookup
-		symbol = getSymbolDepth(var->table, var->id, &depth); // get the offset from base scope to current scopes 
+		symbol = getSymbolDepth(var->table, var->id, &depth); // get the distance from current scope to symbol's scope
 		if (!symbol)
 		{
 			fprintf(stderr, "[codegen error] can't retrieve symbol for %s @ %d\n", var->id, var->lineno);
@@ -609,7 +615,7 @@ void ir_var(VAR* var) // revisit this
 			else if (depth > offset_depth - depth) // get the difference in scopes
 			{
 				link_push(irlist, _mov(rbp, r15, 16, NULL, 1)); // REVERSE IT
-				for (int i = 0; i < ((offset_depth - depth) - 1); i++) 	// iterator over the scope difference and get the value from previous
+				for (int i = 0; i < ((offset_depth - depth) - 1); i++) 	// iterate over the scope difference and get the value from previous
 				{														// frame/base pointer
 					link_push(irlist, _mov(r15, r15, 16, NULL, 1));
 				}

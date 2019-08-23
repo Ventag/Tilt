@@ -1,0 +1,15 @@
+func test(a:int, b:int):int
+write b;
+write a;
+return a;
+end test
+
+func test2(b:int):int
+var c : int;
+c = 10;
+write test(b, c);
+write b+1;
+return b;
+end test2
+
+write test2(4);
