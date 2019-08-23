@@ -2,6 +2,8 @@
 #include "y.tab.h"
 #include <string.h>
 
+int comment = 0;
+int errors = 0;
 extern int lineno;
 extern int fileno();
 %}
@@ -18,10 +20,19 @@ IDENTIFIERS [a-zA-Z_][a-zA-Z0-9_]*
 
 "#".* /*Single comment ignore*/
 
-"(*" {BEGIN(multi_line_comments);}
-<multi_line_comments>"*)" {BEGIN(INITIAL);}
-<multi_line_comments>([^*]|\n)+|.
-<multi_line_comments><<EOF>> {yy_fatal_error("Multi line comments not closed\n");}
+"(*"    {
+        comment++;
+        BEGIN(multi_line_comments);
+        }
+<multi_line_comments>"(*" {comment++;}
+<multi_line_comments>\n {lineno++;}
+<multi_line_comments>. ;
+<multi_line_comments>"*)"   {
+                                comment--;
+                                if(comment == 0)
+                                    BEGIN(INITIAL);
+                            }
+<multi_line_comments><<EOF>> {yy_fatal_error("comments missing a closing line statement");}
 
 "*"             return '*';
 "/"             return '/';

@@ -1,0 +1,8 @@
+func test(a:int):int
+var c : int;
+c = a + 1;
+return c;
+end test1
+
+write test(10);
+
