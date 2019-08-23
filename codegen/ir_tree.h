@@ -39,16 +39,14 @@ void ir_term(TERM*);
 void ir_var(VAR*);
 
 void function_prolog(SYMBOL_TABLE*), function_epilog();
-
 void allocate_local_vars();
-
 void data_section();
 
 typedef enum LABEL_KIND
 {
 	UNKNOWN,
 	FUNC,
-	FLOW
+	LVAR
 } LABEL_KIND;
 
 char* create_label(LABEL_KIND, char*, int);

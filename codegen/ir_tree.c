@@ -44,10 +44,7 @@ LINKEDLIST* build_ir_tree(BODY* body, int unused)
 	link_push(irlist, _ret()); // ret returns what ever is in RAX
 
 	imc->local_var_count = 0;
-
-	//init heap here
 	data_section();
-
 	return irlist;
 }
 void ir_func(FUNCTION* func)
@@ -213,8 +210,8 @@ void ir_statement(STATEMENT* statement)
 			ir_exp(statement->val.exp);
 			link_push(irlist, _pop(rcx));
 			int labelid = label_count++;
-			char* bend = create_label(FLOW, "pbool", labelid);
-			char* btrue = create_label(FLOW, "ptrue", labelid);
+			char* bend = create_label(LVAR, "pbool", labelid);
+			char* btrue = create_label(LVAR, "ptrue", labelid);
 
 			link_push(irlist, _mov(unknown, r10, 1, NULL, 0));
 			link_push(irlist, _cmp(r10, rcx));
@@ -291,8 +288,8 @@ void ir_statement(STATEMENT* statement)
 		break;
 	case IF:
 		link_push(irlist, _push(rax, 0, 0, NULL)); // backup rax
-		char* lbl_else = create_label(FLOW, "else", ilbl);
-		char* lbl_end = create_label(FLOW, "end", ilbl);
+		char* lbl_else = create_label(LVAR, "else", ilbl);
+		char* lbl_end = create_label(LVAR, "end", ilbl);
 		ir_exp(statement->val.stat_if.condition); // will push new value to stack, we pop into rax
 		link_push(irlist, _pop(rax));
 		link_push(irlist, _push(r10, 0, 0, NULL)); // backup r10
@@ -318,8 +315,8 @@ void ir_statement(STATEMENT* statement)
 		break;
 	case WHILE:
 		link_push(irlist, _push(rax, 0, 0, NULL)); // backup rax
-		char* lbl_start = create_label(FLOW, "start", ilbl);
-		char* lbl_wend = create_label(FLOW, "end", ilbl);
+		char* lbl_start = create_label(LVAR, "start", ilbl);
+		char* lbl_wend = create_label(LVAR, "end", ilbl);
 
 		link_push(irlist, _lbl(lbl_start));
 
@@ -374,8 +371,8 @@ void ir_exp_list(EXP_LIST* exp_list)
 void ir_exp(EXP* exp) // term values will be on the stack, so pop them into registers at your leisure
 {
 	int ilabel = label_count++;
-	char* sztrue = create_label(FLOW, "btrue", ilabel);
-	char* szfalse = create_label(FLOW, "bfalse", ilabel);
+	char* sztrue = create_label(LVAR, "btrue", ilabel);
+	char* szfalse = create_label(LVAR, "bfalse", ilabel);
 	switch (exp->kind)
 	{
 	case EXP_TIMES:
@@ -548,7 +545,7 @@ void ir_term(TERM* term)
 		{
 			link_push(irlist, _pop(rbx));
 			int ilabel = label_count++;
-			char* szlabel = create_label(FLOW, "abs", ilabel);
+			char* szlabel = create_label(LVAR, "abs", ilabel);
 
 			link_push(irlist, _push(rcx, 0, 0, NULL)); // backup rcx
 			link_push(irlist, _push(unknown, 0, 0, NULL)); // push 0 to stack
@@ -684,7 +681,7 @@ char* create_label(LABEL_KIND kind, char* content, int offset)
 	case FUNC:
 		sprintf(label, "f_%s", content);
 		break;
-	case FLOW:
+	case LVAR:
 		sprintf(label, "c_%s.%d", content, offset);
 		break;
 	case UNKNOWN:
@@ -695,51 +692,36 @@ char* create_label(LABEL_KIND kind, char* content, int offset)
 	return label;
 }
 
-int is_already_defined(LINKEDLIST *definedList, char *labelName) 
-{
-	LINKEDLIST *iterator = definedList;
-
-	while (iterator->data != NULL)
-	{
-		if (strcmp(labelName, iterator->data) == 0)
-			return 1;
-
-		iterator = iterator->next;
-	}
-	return 0;
-}
-
-void data_section() // revisit / rewrite
+void data_section()
 {
 	link_push(irlist, _dir(".data"));
-
+	// initialize print forms
 	link_push(irlist, _dir("pnum: \n\t.string \"%d\\n\""));
 	link_push(irlist, _dir("ptrue: \n\t.string \"true\\n\""));
 	link_push(irlist, _dir("pfalse: \n\t.string \"false\\n\""));
 	link_push(irlist, _dir("pnull: \n\t.string \"null\\n\""));
-
+	// initialize heap
 	link_push(irlist, _spc("heap_pointer", OFFSET_SIZE * 1024)); // initialize heap max size
 	link_push(irlist, _spc("heap_next", OFFSET_SIZE));
 
-	if (link_length(datalist) < 1)
-		return;
-
 	LINKEDLIST* iterator = datalist;
-	LINKEDLIST* definitions = link_initialize();
-
 	while (iterator != NULL)
 	{
 		VAR_TYPE* vtype = (VAR_TYPE*)iterator->data;
-		SYMBOL* symbol = getSymbol(vtype->table, vtype->id);
-
-		if (symbol && (symbol->typeinfo->type == TYPE_ARRAY || symbol->typeinfo->type == TYPE_RECORD))
+		if(!vtype)
 		{
-			if (is_already_defined(definitions, vtype->id) == 0) // did we define it already?
-			{
-				link_push(irlist, _spc(vtype->id, OFFSET_SIZE));
-				link_push(definitions, vtype->id);
-			}
+			fprintf(stderr, "[ir_tree] heap is empty\n");
+			break;
 		}
+		SYMBOL* symbol = getSymbol(vtype->table, vtype->id);
+		if(!symbol)
+		{
+			fprintf(stderr, "[ir_tree] couldn't get vtype symbol\n");
+			break;
+		}
+		if (symbol && (symbol->typeinfo->type == TYPE_ARRAY || symbol->typeinfo->type == TYPE_RECORD))
+			link_push(irlist, _spc(vtype->id, OFFSET_SIZE));
+
 		iterator = iterator->next;
 	}
 }
