@@ -647,24 +647,19 @@ void function_prolog(SYMBOL_TABLE* scope)
 	allocate_local_vars();
 	imc->local_var_count = 0;
 
-	// CALLEE
 	link_push(irlist, _push(rbx, 0, 0, NULL));
 	link_push(irlist, _push(rsi, 0, 0, NULL));
 	link_push(irlist, _push(rdi, 0, 0, NULL));
-
-	// CALLER
 	link_push(irlist, _push(rcx, 0, 0, NULL));
 	link_push(irlist, _push(rdx, 0, 0, NULL));
+
 	offset_depth++;
 }
 
 void function_epilog() // do we really need more registers when we're not doing any register allocation?
 {
-	// CALLER
 	link_push(irlist, _pop(rdx));
 	link_push(irlist, _pop(rcx));
-
-	// CALLEE
 	link_push(irlist, _pop(rdi));
 	link_push(irlist, _pop(rsi));
 	link_push(irlist, _pop(rbx));
