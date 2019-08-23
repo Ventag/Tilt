@@ -164,8 +164,7 @@ void verify_statement(STATEMENT* statement)
 		{
 			if (symbol->kind == TYPEDEF)
 			{
-				fprintf(stderr, "tried assigning a typedef directly\n");
-				printf("error\n");
+				fprintf(stderr, "[typechecking error] tried assigning a typedef directly\n");
 				exit(1);
 			}
 		}
