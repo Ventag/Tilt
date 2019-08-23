@@ -89,5 +89,5 @@ IDENTIFIERS [a-zA-Z_][a-zA-Z0-9_]*
 {IDENTIFIERS}	{ yylval.stringconst = (char *)malloc(strlen(yytext)+1);
                          sprintf(yylval.stringconst,"%s",yytext);
                          return ID_TOKEN; }
-.               /* ignore */;
+.               { yy_fatal_error("invalid token parsed");}/* throw error if we see an invalid token */;
 %%
