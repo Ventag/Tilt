@@ -47,10 +47,6 @@ Example (leaving out the <Ctrl>-D):
 
 ## Project compiled using:
 gcc -std=c11 -Wall -Wextra -pedantic
-## Final report latex
-https://www.overleaf.com/1689124754nngdhpcwynzs
-## Reports in Google Drive
-https://drive.google.com/drive/folders/1WTOQooyfBVuoH7RWte0QuZr29YtsrJp0?usp=sharing
 
 Fred's note:
 gcc *.c ../expressions/*.c ../symbols/*.c -o typecheck -I./expressions -I./symbols
